@@ -59,4 +59,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(403)
             .body(new ErrorResponse("FORBIDDEN", e.getMessage(), Instant.now()));
     }
+
+    @ExceptionHandler(DuplicateRequestException.class)
+    public ResponseEntity<ErrorResponse> onDuplicateRequest(DuplicateRequestException e) {
+        return ResponseEntity.status(409)
+            .body(new ErrorResponse("DUPLICATE_REQUEST", e.getMessage(), Instant.now()));
+    }
 }

@@ -25,6 +25,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/seat-reservation}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/seat-reservation/protocol/openid-connect/certs}
 
   data:
     redis:
@@ -34,7 +35,7 @@ spring:
   cache:
     type: redis
     redis:
-      time-to-live: 2000   # 2 seconds — safe with 1s frontend polling
+      time-to-live: 24h
 
 webhook:
   secret: ${WEBHOOK_SECRET:local-dev-secret}

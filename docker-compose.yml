@@ -66,7 +66,8 @@ services:
       DB_PASS: ${DB_PASS:-seat}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://keycloak:8080/realms/seat-reservation}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/seat-reservation}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/seat-reservation/protocol/openid-connect/certs}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-local-dev-secret}
       MOCK_PAYMENT_URL: ${MOCK_PAYMENT_URL:-http://mock-payment-service:9090}
       BACKEND_URL: ${BACKEND_URL:-http://backend:8080}
