@@ -3,7 +3,7 @@ package com.linkz.seatreservation.adapter.persistence;
 import com.linkz.seatreservation.adapter.persistence.entity.PaymentTransactionEntity;
 import com.linkz.seatreservation.adapter.persistence.repo.PaymentJpaRepository;
 import com.linkz.seatreservation.business.domain.model.Payment;
-import com.linkz.seatreservation.business.port.out.PaymentRepositoryPort;
+import com.linkz.seatreservation.business.port.external.PaymentRepositoryPort;
 import org.springframework.stereotype.Component;
 import java.util.Optional;
 import java.util.UUID;

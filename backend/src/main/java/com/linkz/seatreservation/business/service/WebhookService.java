@@ -3,11 +3,9 @@ package com.linkz.seatreservation.business.service;
 import com.linkz.seatreservation.business.domain.enums.*;
 import com.linkz.seatreservation.business.domain.model.*;
 import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
-import com.linkz.seatreservation.business.port.out.*;
+import com.linkz.seatreservation.business.port.external.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class WebhookService implements HandleWebhookUseCase {

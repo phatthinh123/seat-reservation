@@ -3,7 +3,7 @@ package com.linkz.seatreservation.business;
 import com.linkz.seatreservation.business.domain.enums.*;
 import com.linkz.seatreservation.business.domain.model.*;
 import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
-import com.linkz.seatreservation.business.port.out.*;
+import com.linkz.seatreservation.business.port.external.*;
 import com.linkz.seatreservation.business.service.WebhookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

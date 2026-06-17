@@ -1,10 +1,8 @@
 package com.linkz.seatreservation.concurrency;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.business.domain.enums.BookingStatus;
-import com.linkz.seatreservation.business.domain.enums.SeatStatus;
 import com.linkz.seatreservation.business.port.in.ReconcilePaymentUseCase;
-import com.linkz.seatreservation.business.port.out.PaymentGatewayPort;
+import com.linkz.seatreservation.business.port.external.PaymentGatewayPort;
 import com.linkz.seatreservation.web.dto.BookingResponse;
 import com.linkz.seatreservation.web.dto.HoldSeatRequest;
 import com.linkz.seatreservation.web.dto.PaymentResponse;
@@ -35,7 +33,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;

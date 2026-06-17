@@ -2,8 +2,8 @@ package com.linkz.seatreservation.business.service;
 
 import com.linkz.seatreservation.business.domain.model.Seat;
 import com.linkz.seatreservation.business.port.in.GetSeatsUseCase;
-import com.linkz.seatreservation.business.port.out.CachePort;
-import com.linkz.seatreservation.business.port.out.SeatRepositoryPort;
+import com.linkz.seatreservation.business.port.external.CachePort;
+import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

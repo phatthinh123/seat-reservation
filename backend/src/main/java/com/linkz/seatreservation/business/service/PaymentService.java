@@ -6,7 +6,7 @@ import com.linkz.seatreservation.business.domain.exception.*;
 import com.linkz.seatreservation.business.domain.model.Booking;
 import com.linkz.seatreservation.business.domain.model.Payment;
 import com.linkz.seatreservation.business.port.in.InitiatePaymentUseCase;
-import com.linkz.seatreservation.business.port.out.*;
+import com.linkz.seatreservation.business.port.external.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;

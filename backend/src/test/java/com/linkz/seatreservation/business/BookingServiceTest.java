@@ -2,12 +2,11 @@ package com.linkz.seatreservation.business;
 
 import com.linkz.seatreservation.business.domain.enums.BookingStatus;
 import com.linkz.seatreservation.business.domain.enums.SeatStatus;
-import com.linkz.seatreservation.business.domain.exception.DuplicateRequestException;
 import com.linkz.seatreservation.business.domain.exception.SeatUnavailableException;
 import com.linkz.seatreservation.business.domain.model.Booking;
 import com.linkz.seatreservation.business.domain.model.Seat;
 import com.linkz.seatreservation.business.port.in.HoldSeatUseCase;
-import com.linkz.seatreservation.business.port.out.*;
+import com.linkz.seatreservation.business.port.external.*;
 import com.linkz.seatreservation.business.service.BookingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

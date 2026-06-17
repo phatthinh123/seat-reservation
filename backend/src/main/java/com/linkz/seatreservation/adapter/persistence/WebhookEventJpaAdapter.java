@@ -2,7 +2,7 @@ package com.linkz.seatreservation.adapter.persistence;
 
 import com.linkz.seatreservation.adapter.persistence.entity.WebhookEventEntity;
 import com.linkz.seatreservation.adapter.persistence.repo.WebhookEventJpaRepository;
-import com.linkz.seatreservation.business.port.out.WebhookEventRepositoryPort;
+import com.linkz.seatreservation.business.port.external.WebhookEventRepositoryPort;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 

@@ -7,11 +7,11 @@ import com.linkz.seatreservation.business.domain.exception.SeatUnavailableExcept
 import com.linkz.seatreservation.business.domain.model.Booking;
 import com.linkz.seatreservation.business.domain.model.Seat;
 import com.linkz.seatreservation.business.port.in.HoldSeatUseCase;
-import com.linkz.seatreservation.business.port.out.AuditPort;
-import com.linkz.seatreservation.business.port.out.BookingRepositoryPort;
-import com.linkz.seatreservation.business.port.out.CachePort;
-import com.linkz.seatreservation.business.port.out.DistributedLockPort;
-import com.linkz.seatreservation.business.port.out.SeatRepositoryPort;
+import com.linkz.seatreservation.business.port.external.AuditPort;
+import com.linkz.seatreservation.business.port.external.BookingRepositoryPort;
+import com.linkz.seatreservation.business.port.external.CachePort;
+import com.linkz.seatreservation.business.port.external.DistributedLockPort;
+import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;

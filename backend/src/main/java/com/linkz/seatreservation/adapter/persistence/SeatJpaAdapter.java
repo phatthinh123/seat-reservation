@@ -3,7 +3,7 @@ package com.linkz.seatreservation.adapter.persistence;
 import com.linkz.seatreservation.adapter.persistence.entity.SeatEntity;
 import com.linkz.seatreservation.adapter.persistence.repo.SeatJpaRepository;
 import com.linkz.seatreservation.business.domain.model.Seat;
-import com.linkz.seatreservation.business.port.out.SeatRepositoryPort;
+import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
 import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;

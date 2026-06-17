@@ -1,6 +1,6 @@
 package com.linkz.seatreservation.adapter.lock;
 
-import com.linkz.seatreservation.business.port.out.DistributedLockPort;
+import com.linkz.seatreservation.business.port.external.DistributedLockPort;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Component;

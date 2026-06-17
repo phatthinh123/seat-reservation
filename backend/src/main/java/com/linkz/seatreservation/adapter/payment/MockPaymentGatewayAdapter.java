@@ -1,6 +1,6 @@
 package com.linkz.seatreservation.adapter.payment;
 
-import com.linkz.seatreservation.business.port.out.PaymentGatewayPort;
+import com.linkz.seatreservation.business.port.external.PaymentGatewayPort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
