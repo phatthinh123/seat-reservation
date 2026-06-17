@@ -23,10 +23,11 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
-    path: 'confirmation/:bookingId',
+    path: 'confirmation',
     loadComponent: () => import('./pages/confirmation/confirmation.component').then(m => m.ConfirmationComponent),
     canActivate: [authGuard]
   },
+
   {
     path: 'admin',
     loadComponent: () => import('./pages/admin/admin.component').then(m => m.AdminComponent),
