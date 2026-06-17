@@ -1,0 +1,2 @@
+rootProject.name = 'seat-reservation'
+include 'backend', 'mock-payment-service'

@@ -1,0 +1,10 @@
+server:
+  port: 9090
+
+webhook:
+  url: ${WEBHOOK_URL:http://localhost:8080/api/webhooks/payment}
+  secret: ${WEBHOOK_SECRET:local-dev-secret}
+
+logging:
+  level:
+    com.linkz: DEBUG
