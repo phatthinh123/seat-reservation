@@ -159,9 +159,10 @@ export class SeatsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadSeats();
+    // Poll every 60 seconds - backend handles cleanup and cache is write-through
     this.pollInterval = setInterval(() => {
       this.loadSeats();
-    }, 1000);
+    }, 60000);
   }
 
   ngOnDestroy(): void {
@@ -187,7 +188,7 @@ export class SeatsComponent implements OnInit, OnDestroy {
   holdSeat(seatId: string): void {
     this.bookingService.holdSeat(seatId).subscribe({
       next: (res) => {
-        this.router.navigate(['/payment', res.bookingId]);
+        this.router.navigate(['/payment', res.bookingId], { state: { booking: res } });
       },
       error: (err) => {
         console.error('Error holding seat', err);

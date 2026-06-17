@@ -38,17 +38,14 @@ import { BookingService, BookingResponse } from '../../core/services/booking.ser
           <button class="btn btn-primary action-btn" (click)="returnToSeats()">Return to Seats</button>
         </div>
 
-        <!-- Failed / Expired State -->
-        <div class="status-content" *ngIf="status === 'FAILED' || status === 'EXPIRED'">
+        <!-- Failed / Expired / Cancelled State -->
+        <div class="status-content" *ngIf="status === 'FAILED' || status === 'EXPIRED' || status === 'CANCELLED'">
           <div class="fail-icon">❌</div>
           <h1 class="status-title text-danger">
-            {{ status === 'EXPIRED' ? 'Hold Expired' : 'Payment Failed' }}
+            {{ status === 'EXPIRED' ? 'Hold Expired' : status === 'CANCELLED' ? 'Payment Cancelled' : 'Payment Failed' }}
           </h1>
           <p class="status-desc">
-            {{ status === 'EXPIRED' 
-                ? 'Your seat hold expired before payment could be finalized.' 
-                : 'The payment transaction failed. Please try again or use another card.' 
-            }}
+            {{ getFailureReason() }}
           </p>
           <button class="btn btn-secondary action-btn" (click)="returnToSeats()">Return to Seats</button>
         </div>
@@ -221,8 +218,20 @@ export class ConfirmationComponent implements OnInit, OnDestroy {
 
   getStatusCardClass(): string {
     if (this.status === 'CONFIRMED') return 'card-success';
-    if (this.status === 'FAILED' || this.status === 'EXPIRED') return 'card-danger';
+    if (this.status === 'FAILED' || this.status === 'EXPIRED' || this.status === 'CANCELLED') return 'card-danger';
     return '';
+  }
+
+  getFailureReason(): string {
+    switch (this.status) {
+      case 'EXPIRED':
+        return 'Your seat hold expired before payment could be finalized. The 10-minute hold window has passed.';
+      case 'CANCELLED':
+        return 'The payment was cancelled. The seat has been released and is now available for others.';
+      case 'FAILED':
+      default:
+        return 'The payment transaction failed. Please try again or use another payment method.';
+    }
   }
 
   returnToSeats(): void {

@@ -201,14 +201,24 @@ export class PaymentComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
-      const bookingId = params['bookingId'];
-      if (bookingId) {
-        this.loadBooking(bookingId);
-      } else {
-        this.errorMessage = 'Booking ID is missing.';
-      }
-    });
+    // Try to get booking from router state first (passed from seats page)
+    const navigation = this.router.getCurrentNavigation();
+    const state = navigation?.extras?.state || history.state;
+    
+    if (state?.booking) {
+      this.booking = state.booking;
+      this.startTimer();
+    } else {
+      // Fallback: get bookingId from URL and fetch from API
+      this.route.params.subscribe(params => {
+        const bookingId = params['bookingId'];
+        if (bookingId) {
+          this.loadBooking(bookingId);
+        } else {
+          this.errorMessage = 'Booking ID is missing.';
+        }
+      });
+    }
   }
 
   ngOnDestroy(): void {
