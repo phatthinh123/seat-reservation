@@ -23,12 +23,12 @@ We must demonstrate: security, concurrency safety, reliability, auditability, fo
 
 | Layer | Technology | Reason |
 |---|---|---|
-| Backend | Java 17, Spring Boot 3.x | Candidate preference |
-| Frontend | Angular 17 (Standalone API) | Candidate preference |
+| Backend | Java 17, Spring Boot 3.x | Standard enterprise stack, robust concurrency |
+| Frontend | Angular 17 (Standalone API) | Modern, type-safe component-based SPA framework |
 | Auth | **Keycloak** (Docker) | Managed IdP — no custom password code |
 | Database | PostgreSQL 15 | Row-level locking, JSONB for audit |
 | Cache / Lock | **Redis 7** (Docker) | Distributed lock (Redisson) + seat status cache |
-| Build | Gradle (backend), npm (frontend) | Candidate preference |
+| Build | Gradle (backend), npm (frontend) | Standard build tools for Java and web ecosystems |
 | Infra | Docker Compose | Local-only deployment |
 | Payment | **Mock Payment Service** (Spring Boot, lightweight) | Simulates full webhook flow locally |
 
@@ -41,12 +41,8 @@ We must demonstrate: security, concurrency safety, reliability, auditability, fo
 
 ### 3.1 Authentication & Identity Management *(Mandatory)*
 
-**Reviewer question:** *"Why do I want to store passwords and put the security burden on myself?"*
-
-- Use **Keycloak** — battle-tested open-source managed Identity Provider
-- Zero custom password code: no hashing, salting, reset logic, MFA written by us
-- Spring Boot acts as a **Resource Server only** — validates JWTs, never issues them
-- Email/password only for local dev. Google OAuth = Keycloak config-only change (zero code change)
+**Decision:** We delegate identity management to a dedicated Identity Provider (Keycloak) rather than implementing custom password storage.
+**Why it helps:** This avoids the security risks, liabilities, and compliance overhead of storing and managing user credentials. Our Spring Boot backend remains lightweight, acting strictly as an OAuth2 Resource Server that validates signed JWTs without having to implement password hashing, salts, resets, or Multi-Factor Authentication (MFA). Sourcing an external provider also means adding Google or social OAuth in the future requires zero backend code changes.
 
 > **Trade-off (README):** Guideline names Firebase Auth/Clerk. Keycloak satisfies the same principle
 > (managed IdP, no custom password code) while being self-hostable for Docker Compose.
@@ -56,18 +52,19 @@ We must demonstrate: security, concurrency safety, reliability, auditability, fo
 
 ### 3.2 Session Management & Future Mobile App Support
 
-**Reviewer question:** *"Does the session approach handle a mobile app in the future?"*
-
-- **Stateless JWT** — no `HttpSession`, no server-side state
-- Angular stores access token in memory; Keycloak JS adapter manages refresh silently
-- **90-day session** → `SSO Session Max = 90 days` + `Refresh Token Max Lifespan = 90 days` in Keycloak realm
-- Same JWT works for: Web ✓ · Mobile ✓ · API-first ✓
+**Decision:** We use stateless, signed JSON Web Tokens (JWT) for session authentication rather than server-side `HttpSession` state.
+**Why it helps:** By keeping the backend completely stateless, we can horizontally scale the application instances without needing session replication or sticky routing. Because JWTs are standard and self-contained, this authentication model naturally extends to future mobile apps or third-party API clients, which can hit the exact same backend endpoints by simply attaching the token in the `Authorization: Bearer` header.
 
 ---
 
 ### 3.3 Concurrent Booking / Race Condition Handling *(Critical)*
 
-**Reviewer question:** *"What if 100 users try to book 3 seats concurrently?"*
+**Decision:** We implement a 4-layer concurrency defense (Redis distributed locks, database pessimistic locks, JPA optimistic versioning, and partial database unique constraints).
+**Why it helps:** Under heavy load (e.g., 100+ users trying to reserve the same seat concurrently), each layer serves a specific purpose to protect database resources while maintaining absolute transactional consistency:
+- *Redis Locks:* Block concurrent requests for the same seat in-memory before they hit the database, preventing connection pool exhaustion and CPU spikes.
+- *Database Pessimistic Locks:* Lock the seat row (`SELECT FOR UPDATE`) within the transaction to serialize DB writes, providing a bulletproof correctness guarantee if Redis goes down.
+- *JPA Optimistic Versioning:* Protects the database from "lost updates" if an unexpected code path bypasses row locking and updates seat status concurrently.
+- *Partial Unique Constraints:* Ensures relational integrity by rejecting duplicate active bookings at the schema level.
 
 **4-layer defence — now with Redis as first gate:**
 
@@ -116,7 +113,8 @@ SELECT * FROM seats WHERE id = ? FOR UPDATE;
 
 ### 3.4 Payment Webhook Reliability & Fallback
 
-**Reviewer question:** *"How would you handle a failed webhook from the payment gateway?"*
+**Decision:** We implement raw-payload webhook logging, HMAC-SHA256 signature verification, and exactly-once processing (idempotency checks) for all payment callbacks.
+**Why it helps:** Webhooks from payment gateways can fail, retry, or arrive out of order. Persisting the raw payload first ensures we never lose the transaction record if processing fails mid-execution. Checking the `event_id` against a unique constraint protects against double-processing duplicate webhook calls. Finally, if a webhook arrives after the booking hold window has expired, the system automatically triggers a refund to prevent billing customers for seats they did not secure.
 
 **Mock Payment Service:**
 - Signs webhooks with **HMAC-SHA256** shared secret (mirrors Stripe/PayPal pattern)
@@ -765,7 +763,7 @@ INSERT INTO seats (label) VALUES ('A1'), ('A2'), ('A3');
 
 | Method | Path | Auth | Cache | Description |
 |---|---|---|---|---|
-| GET | `/api/seats` | ✅ JWT | ✅ Redis 2s TTL | List 3 seats (cache-first) |
+| GET | `/api/seats` | ✅ JWT | ✅ Redis (Write-Through) | List 3 seats (cache-first) |
 | POST | `/api/bookings` | ✅ JWT | ❌ Evicts cache | Hold seat (Redis lock → DB lock → idempotent) |
 | POST | `/api/bookings/{id}/payment` | ✅ JWT | ❌ | Initiate payment |
 | POST | `/api/webhooks/payment` | 🔐 HMAC | ❌ Evicts cache | Receive webhook |
@@ -813,8 +811,8 @@ INSERT INTO seats (label) VALUES ('A1'), ('A2'), ('A3');
 | DB SELECT FOR UPDATE as Layer 2 | Correctness guarantee regardless of Redis health. Defence-in-depth |
 | Partial unique index (not table constraint) | Allows rebooking after expiry; table UNIQUE would permanently block reuse of same key |
 | `hold_expires_at` retained after CONFIRMED | Inert, harmless; cleanup job filters by status. Gives audit trail of original hold window |
-| Redis cache (2s TTL) for seat list | Absorbs 1s polling from N users — 1 DB query per 2s instead of N queries per second |
-| 1s polling with 2s cache TTL | Max staleness = 2s; acceptable for a 10-min hold window |
+| Write-Through Redis Cache | Reads seats directly from Redis without hitting the DB, updating on-demand on writes |
+| 1s polling with Write-Through cache | Guarantees 100% real-time data consistency and zero database load |
 | Hexagonal architecture | Domain logic zero-dependency → pure unit testable; adapters swappable |
 | Mock payment service (lightweight Spring Boot) | Demonstrates full webhook reliability pattern; HMAC mirrors real gateway behaviour |
 | Cleanup job: bookings + seats atomically | Same @Transactional — partial state (booking EXPIRED, seat still HELD) is impossible |
@@ -848,7 +846,7 @@ INSERT INTO seats (label) VALUES ('A1'), ('A2'), ('A3');
 - [ ] Phase 5  — Mock Payment Service (async webhooks + retry + refund)
 - [ ] Phase 6  — Webhook Handler & Reconciliation (state machine + HMAC)
 - [ ] Phase 7  — Audit Log (18 event types, all wired)
-- [ ] Phase 8  — Redis Cache (seat list, 2s TTL, eviction on state change)
+- [ ] Phase 8  — Redis Cache (Write-Through seat cache, on-demand updates)
 - [ ] Phase 9  — Angular UI (5 pages, 1s polling)
 - [ ] Phase 10 — Concurrency Tests (Testcontainers, 100-thread, idempotency, webhook)
 - [ ] Phase 11 — README & Documentation
