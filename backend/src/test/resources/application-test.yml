@@ -1,0 +1,10 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: true
+webhook:
+  secret: test-secret
+mock-payment:
+  url: http://localhost:9999
