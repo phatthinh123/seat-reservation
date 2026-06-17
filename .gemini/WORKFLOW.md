@@ -23,7 +23,7 @@ implements it, verifies it, then the next agent starts. All design decisions liv
 
 [Milestone 3: Business Logic]
   → Full hexagonal package structure (business / web / adapter)
-  → Seat API with Redis cache (2s TTL)
+  → Seat API with Redis write-through cache (24h safety TTL)
   → Booking API with Redis distributed lock + SELECT FOR UPDATE
   → SeatHoldCleanupJob (@Scheduled 1 min)
   → Mock payment service (async webhook + retry + refund)

@@ -59,9 +59,10 @@ Your job is to:
 - [ ] V6 seeds exactly 3 seats: A1, A2, A3
 
 ### Cache
-- [ ] `GET /api/seats` has `@Cacheable(value = "seats", key = "'all'")`
-- [ ] Every method that changes seat status has `@CacheEvict(value = "seats", allEntries = true)`
-- [ ] Redis TTL is 2 seconds (not longer — would cause visible staleness with 1s polling)
+- [ ] Redis keys are individual `seat:cache:<id>` (not a single key for all seats)
+- [ ] SeatService uses `MGET` to lazy load from Redis cache and database on cache miss
+- [ ] Cache is write-through; any status update (held, reserved, released, manual reconcile, etc.) updates the individual seat cache key immediately
+- [ ] Redis seat cache has a safety TTL (e.g. 24 hours), not 2 seconds
 
 ### Frontend
 - [ ] Polling uses `setInterval` with cleanup on component destroy (`ngOnDestroy`)

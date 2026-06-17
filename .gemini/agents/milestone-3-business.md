@@ -46,22 +46,15 @@ backend/src/main/java/com/linkz/seatreservation/
 │   ├── lock/             RedissonLockAdapter
 │   ├── cache/            RedisCacheAdapter
 │   └── payment/          MockPaymentGatewayAdapter
-└── web/config/           AsyncConfig (already from M2), CacheConfig (Redis TTL 2s)
+└── web/config/           AsyncConfig (already from M2), CacheConfig (Redis CacheConfig)
 ```
 
 ## Key Implementation Rules
 
-### Seat API (with cache)
-```java
-// web/controller/SeatController.java
-@GetMapping("/api/seats")
-@Cacheable(value = "seats", key = "'all'")
-public List<SeatResponse> getSeats() {
-    return seatRepo.findAll().stream().map(SeatResponse::from).toList();
-}
-```
-Cache eviction: add `@CacheEvict(value = "seats", allEntries = true)` to any method
-that changes seat status.
+### Seat API (with Write-Through Cache)
+- Dummy SeatController calls constructor-injected SeatService.
+- SeatService reads seat status from Redis using individual keys (`seat:cache:<id>`) via `MGET` (lazy loading). If cache miss, fetch from Database and put into Redis with 24 hours safety TTL.
+- Write-Through cache: Whenever a seat status is modified (held, reserved, released, etc.), the cache key `seat:cache:<id>` must be updated immediately with the new status.
 
 ### Booking Flow
 1. `POST /api/bookings` → `BookingController` → extract `userId` from JWT sub claim
@@ -70,7 +63,7 @@ that changes seat status.
    - Layer 1: `DistributedLockPort.tryLock(seatId, 500ms, 5000ms)` — fail fast
    - Layer 2 (inside @Transactional): `SeatRepositoryPort.findByIdForUpdate(seatId)`
    - Check AVAILABLE, check idempotency, create booking
-   - Evict seat cache
+   - Update seat cache key with HELD state
 4. Return `BookingResponse`
 
 ### Payment Flow
@@ -213,5 +206,5 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 ✅ Idempotency key returns same booking on retry
 ✅ `GET /api/admin/audit-logs` shows all expected events
 ✅ Mock payment service: /simulate/fail toggles to PAYMENT_FAILED webhook
-✅ Seat list served from Redis cache (verify with Redis CLI: `redis-cli keys *`)
+✅ Seat list served from Redis write-through cache (verify with Redis CLI: `redis-cli keys *` showing individual keys `seat:cache:<id>`)
 ✅ All 18 audit event types have at least one code path that fires them

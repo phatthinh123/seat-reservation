@@ -92,17 +92,21 @@ spring:
     port: ${REDIS_PORT:6379}
 
 # In business/service or web/controller:
-@Cacheable(value = "seats", key = "'all'")
-public List<SeatResponse> getAllSeats() { ... }
+# Write-Through Cache example:
+// SeatService.java
+public Seat getSeat(UUID id) {
+    Seat cached = cachePort.get("seat:cache:" + id, Seat.class);
+    if (cached != null) return cached;
+    Seat seat = seatRepo.findById(id).orElseThrow();
+    cachePort.put("seat:cache:" + id, seat, 24 * 3600); // 24h safety TTL
+    return seat;
+}
 
-@CacheEvict(value = "seats", allEntries = true)
-public void holdSeat(...) { ... }
-
-# Cache TTL config:
-@Bean
-public RedisCacheConfiguration cacheConfig() {
-    return RedisCacheConfiguration.defaultCacheConfig()
-        .entryTtl(Duration.ofSeconds(2));
+public void updateSeatStatus(UUID id, SeatStatus status) {
+    Seat seat = seatRepo.findByIdForUpdate(id);
+    seat.setStatus(status);
+    seatRepo.save(seat);
+    cachePort.put("seat:cache:" + id, seat, 24 * 3600); // Write-Through update
 }
 ```
 
