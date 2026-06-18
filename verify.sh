@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
+# Load environment variables from .env if present
+if [ -f .env ]; then
+  # Export variables to subshells, ignoring comments
+  export $(grep -v '^#' .env | xargs)
+fi
+
+
 echo "=== 1. Obtaining Token ==="
 TOKEN=$(curl -s -X POST http://localhost:8180/realms/seat-reservation/protocol/openid-connect/token \
   -d "client_id=seat-reservation-app&username=user@linkz.com&password=User1234!&grant_type=password" \
@@ -73,7 +80,7 @@ echo "=== 8. Test Duplicate Webhook ==="
 # Construct duplicate webhook payload
 EVENT_ID_DUP="dup-event-$(date +%s)"
 BODY="{\"eventId\":\"$EVENT_ID_DUP\",\"paymentId\":\"$PAYMENT_ID\",\"bookingId\":\"$BOOKING_ID\",\"status\":\"SUCCESS\"}"
-SIGNATURE=$(python3 -c "import hmac, hashlib; print(hmac.new(b'local-dev-secret', b'$BODY', hashlib.sha256).hexdigest())")
+SIGNATURE=$(python3 -c "import hmac, hashlib, sys; print(hmac.new(sys.argv[2].encode('utf-8'), sys.argv[1].encode('utf-8'), hashlib.sha256).hexdigest())" "$BODY" "${WEBHOOK_SECRET:-change-me-in-production}")
 
 RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/webhooks/payment \
   -H "Content-Type: application/json" \
@@ -111,7 +118,7 @@ docker exec -i seat-reservation-postgres psql -U seat -d seatreservation -c "UPD
 # 4. Trigger Webhook SUCCESS for the expired booking
 EVENT_ID_LATE="late-event-$(date +%s)"
 BODY_LATE="{\"eventId\":\"$EVENT_ID_LATE\",\"paymentId\":\"$PAYMENT_LATE_ID\",\"bookingId\":\"$BOOKING_LATE_ID\",\"status\":\"SUCCESS\"}"
-SIGNATURE_LATE=$(python3 -c "import hmac, hashlib; print(hmac.new(b'local-dev-secret', b'$BODY_LATE', hashlib.sha256).hexdigest())")
+SIGNATURE_LATE=$(python3 -c "import hmac, hashlib, sys; print(hmac.new(sys.argv[2].encode('utf-8'), sys.argv[1].encode('utf-8'), hashlib.sha256).hexdigest())" "$BODY_LATE" "${WEBHOOK_SECRET:-change-me-in-production}")
 
 RESPONSE_CODE_LATE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/webhooks/payment \
   -H "Content-Type: application/json" \
