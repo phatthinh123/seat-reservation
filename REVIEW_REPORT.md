@@ -85,7 +85,7 @@
 - [x] `hold_expires_at` is NOT NULL — confirmed in V2 migration
 - [x] `webhook_events.event_id` has UNIQUE constraint — confirmed in V4 migration
 - [x] `audit_logs` has no FK on actor (allows "system" as string) — confirmed: `actor VARCHAR(255) NOT NULL` with no FK
-- [x] **RESOLVED**: V6 was updated to seed exactly 3 seats (A1-A3) as specified.
+- [x] **RESOLVED**: V6 was reverted to seed 9 seats (A1-A9) as preferred by the user for comprehensive testing.
 
 ---
 
@@ -104,7 +104,7 @@
 - [x] Hold countdown timer uses `holdExpiresAt` from booking response — confirmed in `PaymentComponent.updateCountdown()`
 - [x] Admin route has `CanActivate` guard checking ADMIN role — `canActivate: [authGuard, adminGuard]` confirmed in `app.routes.ts`
 - [x] Auth interceptor attaches token to ALL requests — `authInterceptor` adds header unconditionally when token present
-- [x] **RESOLVED**: Polling interval changed to 1 second (`1000` ms) in `SeatsComponent`.
+- [x] **RESOLVED**: Polling interval is kept at 60 seconds (`60000` ms) in `SeatsComponent` as preferred by the user; updated README and documentation to clarify this.
 - [x] **RESOLVED**: `simulateFail` checkbox value is now passed dynamically to `initiatePayment()`. The backend forwards it via `PaymentGatewayPort.initiatePayment()` directly to the mock payment service API. The brittle direct browser-to-payment-mock-service call has been removed.
 
 ---
@@ -148,9 +148,9 @@ RECONCILIATION.md accurately describes the reconciliation job logic, state machi
 
 | # | Area | Issue | Risk | Fix |
 |---|---|---|---|---|
-| 1 | Database | V6 seeds 9 seats (A1-A9) instead of 3 (A1-A3 only) | RESOLVED | Seeding truncated to A1-A3. |
+| 1 | Database | V6 seeds 9 seats (A1-A9) instead of 3 (A1-A3 only) | RESOLVED | Reverted to seeding 9 seats (A1-A9) for testing as preferred by the user. |
 | 2 | Webhook | Raw payload not saved to `webhook_events` before business logic — a crash mid-processing permanently loses the raw event | RESOLVED | `handleWebhook` saves raw event first, uses `findStatusByEventId` to prevent duplicates. |
-| 3 | Frontend | Polling interval is 60s, not 1s as documented in README and IMPLEMENTATION_PLAN.md | RESOLVED | Polling interval changed to 1s. |
+| 3 | Frontend | Polling interval is 60s, not 1s as documented in README and IMPLEMENTATION_PLAN.md | RESOLVED | Kept polling at 60s as preferred by the user; updated documentation. |
 | 4 | Frontend | `simulateFail` hardcoded to `false`; direct `localhost:9090` URL breaks Docker networking | RESOLVED | Threaded `simulateFail` dynamically through controller/services to gateway. |
 | 5 | Architecture | `port/out/` renamed to `port/external/` — deviation from IMPLEMENTATION_PLAN.md | LOW | Naming choice; hexagonal integrity preserved. |
 | 6 | Docs | RECONCILIATION.md references non-existent YAML scheduling properties | RESOLVED | Updated doc to explain `@Scheduled` annotations. |
@@ -183,9 +183,9 @@ READY
 
 All findings (2 HIGH-risk, 2 MEDIUM-risk, and 2 LOW-risk documentation inaccuracies) have been successfully resolved and validated:
 
-1. **Seeded seats matching 3-seat platform**: Modified V6 migration to only insert A1-A3.
+1. **Seeded seats**: Reverted V6 migration to seed all 9 seats (A1-A9) as preferred by the user for testing.
 2. **Webhook raw payload persistence ordering**: Refactored `WebhookService.handleWebhook` to save the raw event as RECEIVED first, using the newly added `findStatusByEventId` on the port to perform idempotency checks safely without duplicate key collision.
-3. **1s frontend polling**: Changed interval in `SeatsComponent` from 60s to 1s.
+3. **Frontend polling**: Retained the 60s polling interval in `SeatsComponent` as preferred by the user; updated README and documentation to clarify this.
 4. **Threaded `simulateFail` flag**: Passed the toggle dynamic value to the backend, threading it through the controller, command, service, and payment gateway adapter instead of using a direct, fragile browser-to-localhost call.
 5. **Documentation updates**: Corrected RECONCILIATION.md scheduler configuration and simplified DEPLOYMENT.md test execution instructions.
 

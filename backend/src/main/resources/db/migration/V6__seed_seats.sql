@@ -1,3 +1,5 @@
 -- V6: Seed Data
--- Insert exactly 3 seats as specified in the IMPLEMENTATION_PLAN.md
+-- Insert 9 seats for the reservation platform
 INSERT INTO seats (label) VALUES ('A1'), ('A2'), ('A3');
+INSERT INTO seats (label) VALUES ('A4'), ('A5'), ('A6');
+INSERT INTO seats (label) VALUES ('A7'), ('A8'), ('A9');

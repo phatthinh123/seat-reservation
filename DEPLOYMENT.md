@@ -20,7 +20,7 @@ Before you start, ensure the following tools are installed on your machine:
 
 ```bash
 git clone <your-repo-url>
-cd seat-reservation/seat-reservation
+cd seat-reservation
 ```
 
 ### 2. Configure Environment Variables

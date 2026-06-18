@@ -6,6 +6,7 @@ import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
 import com.linkz.seatreservation.business.port.external.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import java.util.Map;
 
 @Service
 public class WebhookService implements HandleWebhookUseCase {
@@ -43,7 +44,8 @@ public class WebhookService implements HandleWebhookUseCase {
         if (existingStatus.isPresent()) {
             String status = existingStatus.get();
             if ("PROCESSED".equals(status) || "DUPLICATE".equals(status)) {
-                auditPort.log("system", "WEBHOOK_DUPLICATE", "WEBHOOK", cmd.eventId(), null, "Duplicate event ID checked");
+                auditPort.log("system", "WEBHOOK_DUPLICATE", "WEBHOOK", cmd.eventId(), null, 
+                    auditDetails("Duplicate event ID checked", cmd.eventId(), cmd.rawPayload()));
                 webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "DUPLICATE", "Duplicate event detected");
                 return;
             }
@@ -70,21 +72,25 @@ public class WebhookService implements HandleWebhookUseCase {
                 switch (booking.status()) {
                     case PENDING -> {
                         if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
-                            confirmBooking(booking, seat, payment, cmd.eventId());
+                            confirmBooking(booking, seat, payment, cmd);
                         } else {
-                            failBooking(booking, seat, payment, cmd.eventId());
+                            failBooking(booking, seat, payment, cmd);
                         }
                     }
                     case EXPIRED, CANCELLED -> {
                         if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
-                            handleLateArrival(booking, payment, cmd.eventId());
+                            handleLateArrival(booking, payment, cmd);
                         } else {
                             webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
-                            auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, "Failed payment for already expired/cancelled booking");
+                            auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, 
+                                auditDetails("Failed payment for already expired/cancelled booking", cmd.eventId(), cmd.rawPayload()));
                         }
                     }
                     case CONFIRMED -> {
-                        auditPort.log("system", "WEBHOOK_DUPLICATE", "BOOKING", booking.id().toString(), booking, booking);
+                        Map<String, Object> dupDetails = auditDetails("booking", booking, cmd.eventId());
+                        dupDetails.put("message", "Duplicate webhook for confirmed booking");
+                        dupDetails.put("rawPayload", cmd.rawPayload());
+                        auditPort.log("system", "WEBHOOK_DUPLICATE", "BOOKING", booking.id().toString(), booking, dupDetails);
                         webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", "Duplicate webhook for confirmed booking");
                     }
                 }
@@ -95,7 +101,7 @@ public class WebhookService implements HandleWebhookUseCase {
         }
     }
 
-    private void confirmBooking(Booking booking, Seat seat, Payment payment, String eventId) {
+    private void confirmBooking(Booking booking, Seat seat, Payment payment, WebhookEventCommand cmd) {
         Booking confirmedBooking = new Booking(
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CONFIRMED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
@@ -111,19 +117,19 @@ public class WebhookService implements HandleWebhookUseCase {
         );
         paymentRepo.save(successPayment);
 
-        webhookEventRepo.saveEvent("mock-payment", eventId, "", "PROCESSED", null);
+        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
         // Write-through cache updates
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
         cachePort.put("idempotency:key:" + booking.idempotencyKey(), confirmedBooking, 2 * 3600);
 
-        auditPort.log("system", "BOOKING_CONFIRMED", "BOOKING", booking.id().toString(), booking, confirmedBooking);
-        auditPort.log("system", "SEAT_RESERVED", "SEAT", seat.id().toString(), seat, savedSeat);
-        auditPort.log("system", "PAYMENT_SUCCESS", "PAYMENT", payment.id().toString(), payment, successPayment);
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", eventId, null, "Booking confirmed");
+        auditPort.log("system", "BOOKING_CONFIRMED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", confirmedBooking, cmd.eventId()));
+        auditPort.log("system", "SEAT_RESERVED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));
+        auditPort.log("system", "PAYMENT_SUCCESS", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", successPayment, cmd.eventId()));
+        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Booking confirmed", cmd.eventId(), cmd.rawPayload()));
     }
 
-    private void failBooking(Booking booking, Seat seat, Payment payment, String eventId) {
+    private void failBooking(Booking booking, Seat seat, Payment payment, WebhookEventCommand cmd) {
         Booking cancelledBooking = new Booking(
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CANCELLED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
@@ -139,20 +145,20 @@ public class WebhookService implements HandleWebhookUseCase {
         );
         paymentRepo.save(failedPayment);
 
-        webhookEventRepo.saveEvent("mock-payment", eventId, "", "PROCESSED", null);
+        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
         // Write-through cache updates
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
         cachePort.evict("idempotency:key:" + booking.idempotencyKey());
 
-        auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, cancelledBooking);
-        auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, savedSeat);
-        auditPort.log("system", "PAYMENT_FAILED", "PAYMENT", payment.id().toString(), payment, failedPayment);
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", eventId, null, "Booking cancelled due to payment failure");
+        auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", cancelledBooking, cmd.eventId()));
+        auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));
+        auditPort.log("system", "PAYMENT_FAILED", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", failedPayment, cmd.eventId()));
+        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Booking cancelled due to payment failure", cmd.eventId(), cmd.rawPayload()));
     }
 
-    private void handleLateArrival(Booking booking, Payment payment, String eventId) {
-        auditPort.log("system", "WEBHOOK_LATE_ARRIVAL", "BOOKING", booking.id().toString(), booking, booking);
+    private void handleLateArrival(Booking booking, Payment payment, WebhookEventCommand cmd) {
+        auditPort.log("system", "WEBHOOK_LATE_ARRIVAL", "BOOKING", booking.id().toString(), booking, auditDetails("booking", booking, cmd.eventId()));
 
         Payment refundedPayment = new Payment(
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
@@ -160,12 +166,27 @@ public class WebhookService implements HandleWebhookUseCase {
         );
         paymentRepo.save(refundedPayment);
 
-        webhookEventRepo.saveEvent("mock-payment", eventId, "", "PROCESSED", "Late arrival refund triggered");
+        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", "Late arrival refund triggered");
 
-        auditPort.log("system", "REFUND_INITIATED", "PAYMENT", payment.id().toString(), payment, refundedPayment);
+        auditPort.log("system", "REFUND_INITIATED", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", refundedPayment, cmd.eventId()));
         paymentGateway.refund(payment.externalPaymentId());
         
-        auditPort.log("system", "REFUND_COMPLETED", "PAYMENT", payment.id().toString(), refundedPayment, refundedPayment);
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", eventId, null, "Late arrival auto-refund completed");
+        auditPort.log("system", "REFUND_COMPLETED", "PAYMENT", payment.id().toString(), refundedPayment, auditDetails("payment", refundedPayment, cmd.eventId()));
+        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Late arrival auto-refund completed", cmd.eventId(), cmd.rawPayload()));
+    }
+
+    private Map<String, Object> auditDetails(String message, String eventId, String rawPayload) {
+        Map<String, Object> details = new java.util.HashMap<>();
+        details.put("message", message);
+        details.put("eventId", eventId);
+        details.put("rawPayload", rawPayload);
+        return details;
+    }
+
+    private Map<String, Object> auditDetails(Object dataKey, Object dataValue, String eventId) {
+        Map<String, Object> details = new java.util.HashMap<>();
+        details.put(String.valueOf(dataKey), dataValue);
+        details.put("triggerEventId", eventId);
+        return details;
     }
 }
