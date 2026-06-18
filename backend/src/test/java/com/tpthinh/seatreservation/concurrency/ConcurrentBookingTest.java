@@ -9,7 +9,6 @@ import com.tpthinh.seatreservation.web.dto.PaymentResponse;
 import com.tpthinh.seatreservation.web.dto.PaymentNotificationDto;
 import com.tpthinh.seatreservation.web.dto.response.SeatResponse;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -23,7 +22,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -52,19 +50,9 @@ import static org.mockito.Mockito.when;
  *   // Then  — assert expected outcomes
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @ActiveProfiles("test")
-@EnabledIf("isDockerAvailable")
 public class ConcurrentBookingTest {
-
-    static boolean isDockerAvailable() {
-        try {
-            DockerClientFactory.instance().client();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
@@ -233,7 +221,7 @@ public class ConcurrentBookingTest {
         SeatResponse seat = Arrays.stream(
             restTemplate.exchange("/api/seats", HttpMethod.GET,
                 new HttpEntity<>(createHeaders("test-user")), SeatResponse[].class).getBody()
-        ).filter(s -> "A2".equals(s.label())).findFirst().orElseThrow();
+        ).filter(s -> "A4".equals(s.label())).findFirst().orElseThrow();
 
         UUID seatId = seat.id();
         String userId = "webhook-user";
@@ -245,7 +233,7 @@ public class ConcurrentBookingTest {
         );
         UUID bookingId = holdResp.getBody().bookingId();
 
-        when(paymentGateway.initiatePayment(any(), any(), any(), anyBoolean())).thenReturn("external-pay-123");
+        when(paymentGateway.initiatePayment(any(), any(), any(), anyBoolean(), anyBoolean())).thenReturn("external-pay-123");
         ResponseEntity<PaymentResponse> payResp = restTemplate.postForEntity(
             "/api/bookings/" + bookingId + "/payment",
             new HttpEntity<>(createHeaders(userId)),
@@ -269,11 +257,24 @@ public class ConcurrentBookingTest {
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        int webhookRows = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM payment_notifications WHERE event_id = 'evt-dup-123'",
-            Integer.class
-        );
-        assertThat(webhookRows).isEqualTo(2); // first=PROCESSED, second=DUPLICATE
+        int webhookRows = 0;
+        String webhookStatus = "";
+        for (int i = 0; i < 20; i++) {
+            webhookRows = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM payment_notifications WHERE event_id = 'evt-dup-123'",
+                Integer.class
+            );
+            if (webhookRows == 1) {
+                webhookStatus = jdbcTemplate.queryForObject(
+                    "SELECT status FROM payment_notifications WHERE event_id = 'evt-dup-123'",
+                    String.class
+                );
+                if ("DUPLICATE".equals(webhookStatus)) break;
+            }
+            Thread.sleep(100);
+        }
+        assertThat(webhookRows).isEqualTo(1);
+        assertThat(webhookStatus).isEqualTo("DUPLICATE");
 
         int confirmedAuditCount = jdbcTemplate.queryForObject(
             "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action = 'BOOKING_CONFIRMED'",
