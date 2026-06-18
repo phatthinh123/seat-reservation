@@ -91,29 +91,6 @@ Our payment flow handles webhook unreliability (dropped calls, network latency, 
 
 ---
 
-## Key Design Decisions & Trade-offs
-
-Each design decision reflects careful consideration of complexity vs. reliability:
-
-1. **Keycloak vs. Firebase/Clerk**: Self-hosted Keycloak was chosen because it allows running the entire stack locally with Docker Compose, satisfying the principle of delegating auth to a dedicated IdP without using external internet dependencies. In production, it can be swapped to a cloud-managed IdP (like Firebase Auth or Clerk) with zero application code changes.
-2. **HMAC vs. mTLS for webhooks**: HMAC-SHA256 was selected to sign webhook payloads because the mock payment service simulates a third-party gateway, mirroring industry-standard webhook security (e.g. Stripe, PayPal). mTLS is best suited for internal microservice meshes, whereas HMAC is perfect for public facing APIs and webhooks.
-3. **Redis lock as Layer 1 (Fast-Fail Gate)**: A Redis-based distributed lock is the first line of defense to fail-fast on 99% of concurrent requests for the same seat before hitting the database. This prevents database connection pool exhaustion and CPU spikes under high concurrency.
-4. **DB SELECT FOR UPDATE as Layer 2 (Pessimistic Lock)**: To guarantee absolute correctness, database pessimistic locking acts as Layer 2 inside the transaction. If Redis is temporarily down or partitioned, the database pessimistic lock still safely serializes writes.
-5. **Partial unique index (not table constraint)**: A partial unique index on `bookings(idempotency_key) WHERE status IN ('PENDING', 'CONFIRMED')` allows rebooking after a hold has expired or been cancelled. A traditional table-level UNIQUE constraint would permanently prevent a user from attempting to book the same seat after a failure.
-6. **`hold_expires_at` retained after CONFIRMED**: The `hold_expires_at` timestamp is kept on the booking record even after it's confirmed. This is harmless because the cleanup job filters by pending status, and retaining the timestamp provides a valuable audit trail of the original hold window.
-7. **Write-Through Redis Cache**: Reads for seat statuses are fetched directly from a granular Redis cache instead of hitting the database every time. Cache updates are written immediately during state transitions (write-through) to guarantee real-time consistency.
-8. **60s polling with Write-Through cache**: The frontend polls the seat list every 60 seconds (as configured) to keep the UI up-to-date. Because of the write-through Redis cache, this polling puts zero read load on the PostgreSQL database.
-9. **Hexagonal architecture**: The core business logic has zero framework dependencies (pure Java), separating domain concerns from Spring, JPA, and Redisson. This makes the domain model highly unit-testable and allows infrastructure adapters to be swapped out easily.
-10. **Mock payment service (lightweight Spring Boot)**: A separate lightweight mock payment service was built in Java to simulate real async payment flows. This demonstrates webhook reliability, retries, and failure states in a controlled local environment.
-11. **Cleanup job: bookings + seats atomically**: The cleanup scheduled job runs both booking expiration and seat release in a single `@Transactional` method. This guarantees that a booking cannot be marked as EXPIRED while leaving the seat in the HELD state.
-12. **Auto-refund on late webhook**: If a payment succeeds but the webhook arrives after the 10-minute hold window has expired, the system triggers an automatic refund. This prevents charging the user for a seat that is no longer held.
-13. **Bounded @Async thread pool (Mock Payment)**: The mock payment service uses a thread pool with a CallerRunsPolicy rejection handler. This prevents thread explosion while providing natural backpressure under heavy webhook delivery loads.
-14. **Concurrency integration test (Testcontainers)**: A real PostgreSQL and Redis instance are spun up using Testcontainers for integration tests. This proves the concurrency and race condition behavior under load without relying on fragile mocks.
-15. **Scheduled reconciliation (not Kafka)**: A simple scheduled reconciliation job queries the payment service for stuck pending transactions. This is easier to operate locally and at lower scale than introducing a message broker like Kafka.
-16. **Admin Angular page (not curl-only)**: An admin dashboard is included in the Angular frontend to allow manual reconciliation and inspection of append-only audit logs. This provides operational visibility and makes evaluation easier for the reviewer.
-
----
-
 ## Running Tests
 
 All unit tests and integration tests can be run via Gradle. The integration tests require a local Docker daemon because they use **Testcontainers** to boot up real PostgreSQL and Redis instances.

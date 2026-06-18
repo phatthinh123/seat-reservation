@@ -119,9 +119,17 @@ public class WebhookService implements HandleWebhookUseCase {
 
         webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
-        // Write-through cache updates
-        cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
-        cachePort.put("idempotency:key:" + booking.idempotencyKey(), confirmedBooking, 2 * 3600);
+        // Write-through cache updates (keeping hold/idempotency metadata in the reserved seat cache)
+        Seat cachedSeatWithHoldInfo = new Seat(
+            savedSeat != null ? savedSeat.id() : seat.id(),
+            savedSeat != null ? savedSeat.label() : seat.label(),
+            savedSeat != null ? savedSeat.status() : SeatStatus.RESERVED,
+            booking.userId(),
+            booking.id(),
+            booking.idempotencyKey(),
+            savedSeat != null ? savedSeat.version() : seat.version()
+        );
+        cachePort.put("seat:cache:" + seat.id(), cachedSeatWithHoldInfo, 24 * 3600);
 
         auditPort.log("system", "BOOKING_CONFIRMED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", confirmedBooking, cmd.eventId()));
         auditPort.log("system", "SEAT_RESERVED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));
@@ -149,7 +157,6 @@ public class WebhookService implements HandleWebhookUseCase {
 
         // Write-through cache updates
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
-        cachePort.evict("idempotency:key:" + booking.idempotencyKey());
 
         auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", cancelledBooking, cmd.eventId()));
         auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));

@@ -176,7 +176,6 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
         });
 
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
-        cachePort.evict("idempotency:key:" + booking.idempotencyKey());
 
         auditPort.log("system", "BOOKING_EXPIRED", "BOOKING", booking.id().toString(), booking, expiredBooking);
         auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, savedSeat);
@@ -198,8 +197,16 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
         );
         paymentRepo.save(successPayment);
 
-        cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
-        cachePort.put("idempotency:key:" + booking.idempotencyKey(), confirmedBooking, 2 * 3600);
+        Seat cachedSeatWithHoldInfo = new Seat(
+            savedSeat != null ? savedSeat.id() : seat.id(),
+            savedSeat != null ? savedSeat.label() : seat.label(),
+            savedSeat != null ? savedSeat.status() : SeatStatus.RESERVED,
+            booking.userId(),
+            booking.id(),
+            booking.idempotencyKey(),
+            savedSeat != null ? savedSeat.version() : seat.version()
+        );
+        cachePort.put("seat:cache:" + seat.id(), cachedSeatWithHoldInfo, 24 * 3600);
 
         auditPort.log("system", "BOOKING_CONFIRMED", "BOOKING", booking.id().toString(), booking, confirmedBooking);
         auditPort.log("system", "SEAT_RESERVED", "SEAT", seat.id().toString(), seat, savedSeat);
@@ -223,7 +230,6 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
         paymentRepo.save(failedPayment);
 
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
-        cachePort.evict("idempotency:key:" + booking.idempotencyKey());
 
         auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, cancelledBooking);
         auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, savedSeat);

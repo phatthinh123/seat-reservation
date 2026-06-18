@@ -45,11 +45,20 @@ public class BookingService implements HoldSeatUseCase {
     public BookingResult holdSeat(HoldSeatCommand cmd) {
         String idempotencyKey = cmd.idempotencyKey();
 
-        // 1. Idempotency Pre-Check (Layer 0.5)
-        Booking cachedBooking = cachePort.get("idempotency:key:" + idempotencyKey, Booking.class);
-        if (cachedBooking != null) {
-            String seatLabel = seatRepo.findById(cachedBooking.seatId()).map(Seat::label).orElse("Unknown");
-            return new BookingResult(cachedBooking, seatLabel);
+        // 1. Consolidated Idempotency & Seat Status Check (Layer 0.5 & Layer 0.8)
+        Seat cachedSeat = cachePort.get("seat:cache:" + cmd.seatId(), Seat.class);
+        if (cachedSeat != null) {
+            // Check if this request is a retry of the same idempotency key
+            if (idempotencyKey.equals(cachedSeat.idempotencyKey())) {
+                Booking booking = bookingRepo.findByIdempotencyKey(idempotencyKey).orElse(null);
+                if (booking != null) {
+                    return new BookingResult(booking, cachedSeat.label());
+                }
+            }
+            // If the seat is not available (held/reserved by someone else), fail fast
+            if (cachedSeat.status() != SeatStatus.AVAILABLE) {
+                throw new SeatUnavailableException("Seat is not available.");
+            }
         }
 
         // 2. Idempotency Lock (SETNX lock with 10s TTL) (Layer 0.6)
@@ -59,12 +68,6 @@ public class BookingService implements HoldSeatUseCase {
         }
 
         try {
-            // 3. Seat Status Pre-Check (Layer 0.8)
-            Seat cachedSeat = cachePort.get("seat:cache:" + cmd.seatId(), Seat.class);
-            if (cachedSeat != null && cachedSeat.status() != SeatStatus.AVAILABLE) {
-                throw new SeatUnavailableException("Seat is not available.");
-            }
-
             // 4. Proceed to Distributed Lock (Layer 1)
             boolean distributedLockAcquired = lockPort.tryLock(cmd.seatId().toString(), 500, 5000);
             if (!distributedLockAcquired) {
@@ -107,15 +110,23 @@ public class BookingService implements HoldSeatUseCase {
                     return savedBooking;
                 });
 
-                // 6. Overwrite Redis cache write-through
+                // 6. Overwrite Redis cache write-through (combining seat status & hold/idempotency info)
                 String seatLabel = "Unknown";
                 if (booking != null) {
                     Seat updatedSeat = seatRepo.findById(cmd.seatId()).orElse(null);
                     if (updatedSeat != null) {
-                        cachePort.put("seat:cache:" + cmd.seatId(), updatedSeat, 24 * 3600);
+                        Seat cachedSeatWithHoldInfo = new Seat(
+                            updatedSeat.id(),
+                            updatedSeat.label(),
+                            updatedSeat.status(),
+                            booking.userId(),
+                            booking.id(),
+                            booking.idempotencyKey(),
+                            updatedSeat.version()
+                        );
+                        cachePort.put("seat:cache:" + cmd.seatId(), cachedSeatWithHoldInfo, 24 * 3600);
                         seatLabel = updatedSeat.label();
                     }
-                    cachePort.put("idempotency:key:" + idempotencyKey, booking, 2 * 3600);
                 }
 
                 return new BookingResult(booking, seatLabel);

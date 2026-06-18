@@ -102,7 +102,6 @@ class WebhookServiceTest {
         verify(paymentRepo).save(argThat(p -> p.status() == PaymentStatus.SUCCESS));
         verify(webhookEventRepo).saveEvent(eq("mock-payment"), eq(eventId), any(), eq("PROCESSED"), any());
         verify(cache).put(eq("seat:cache:" + seatId), any(), anyLong());
-        verify(cache).put(eq("idempotency:key:key-1"), any(), anyLong());
     }
 
     // ─── Non-Happy Path ───────────────────────────────────────────────────────

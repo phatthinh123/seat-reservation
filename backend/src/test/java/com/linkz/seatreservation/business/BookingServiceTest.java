@@ -112,8 +112,10 @@ class BookingServiceTest {
             idempotencyKey, LocalDateTime.now().plusMinutes(10),
             LocalDateTime.now(), LocalDateTime.now()
         );
-        when(cache.get(eq("idempotency:key:" + idempotencyKey), eq(Booking.class))).thenReturn(existingBooking);
-        when(seatRepo.findById(seatId)).thenReturn(Optional.of(new Seat(seatId, "A1", SeatStatus.HELD, 0L)));
+        Seat cachedSeat = new Seat(seatId, "A1", SeatStatus.HELD, userId, existingBooking.id(), idempotencyKey, 0L);
+        when(cache.get(eq("seat:cache:" + seatId), eq(Seat.class))).thenReturn(cachedSeat);
+        when(bookingRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(existingBooking));
+        when(seatRepo.findById(seatId)).thenReturn(Optional.of(cachedSeat));
 
         // When — the same request is replayed
         HoldSeatUseCase.BookingResult result = service.holdSeat(
