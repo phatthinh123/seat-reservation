@@ -1,8 +1,8 @@
-package com.linkz.seatreservation.business.domain.event;
+package com.tpthinh.seatreservation.business.domain.event;
 
-import com.linkz.seatreservation.business.domain.model.Booking;
-import com.linkz.seatreservation.business.domain.model.Payment;
-import com.linkz.seatreservation.business.domain.model.Seat;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.model.Payment;
+import com.tpthinh.seatreservation.business.domain.model.Seat;
 import java.util.UUID;
 
 public final class AuditEvents {

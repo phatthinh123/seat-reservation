@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.business.domain.enums;
+package com.tpthinh.seatreservation.business.domain.enums;
 
 public enum PaymentStatus {
     PENDING,

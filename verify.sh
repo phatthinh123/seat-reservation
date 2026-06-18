@@ -10,7 +10,7 @@ fi
 
 echo "=== 1. Obtaining Token ==="
 TOKEN=$(curl -s -X POST http://localhost:8180/realms/seat-reservation/protocol/openid-connect/token \
-  -d "client_id=seat-reservation-app&username=user@linkz.com&password=User1234!&grant_type=password" \
+  -d "client_id=seat-reservation-app&username=user@tpthinh.com&password=User1234!&grant_type=password" \
   | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
 
 if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then
@@ -143,7 +143,7 @@ fi
 
 echo "=== 10. Verify Audit Logs ==="
 ADMIN_TOKEN=$(curl -s -X POST http://localhost:8180/realms/seat-reservation/protocol/openid-connect/token \
-  -d "client_id=seat-reservation-app&username=admin@linkz.com&password=Admin1234!&grant_type=password" \
+  -d "client_id=seat-reservation-app&username=admin@tpthinh.com&password=Admin1234!&grant_type=password" \
   | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
 
 AUDIT_LOGS=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "http://localhost:8080/api/admin/audit-logs?limit=40")

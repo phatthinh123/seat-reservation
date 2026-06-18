@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.adapter.persistence.entity;
+package com.tpthinh.seatreservation.adapter.persistence.entity;
 
-import com.linkz.seatreservation.business.domain.model.AuditEntry;
+import com.tpthinh.seatreservation.business.domain.model.AuditEntry;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;

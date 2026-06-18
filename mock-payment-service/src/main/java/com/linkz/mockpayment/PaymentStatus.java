@@ -1,4 +1,4 @@
-package com.linkz.mockpayment;
+package com.tpthinh.mockpayment;
 
 public enum PaymentStatus {
     PENDING,

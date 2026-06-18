@@ -1,8 +1,8 @@
-package com.linkz.seatreservation.adapter.persistence;
+package com.tpthinh.seatreservation.adapter.persistence;
 
-import com.linkz.seatreservation.adapter.persistence.entity.PaymentNotificationEntity;
-import com.linkz.seatreservation.adapter.persistence.repo.PaymentNotificationJpaRepository;
-import com.linkz.seatreservation.business.port.external.PaymentNotificationRepositoryPort;
+import com.tpthinh.seatreservation.adapter.persistence.entity.PaymentNotificationEntity;
+import com.tpthinh.seatreservation.adapter.persistence.repo.PaymentNotificationJpaRepository;
+import com.tpthinh.seatreservation.business.port.external.PaymentNotificationRepositoryPort;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.Optional;

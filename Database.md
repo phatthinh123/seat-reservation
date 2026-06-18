@@ -51,7 +51,7 @@ UPDATE bookings SET hold_expires_at = NOW() - INTERVAL '1 minute' WHERE id = 'YO
 
 ### Step 2: Trigger Reconciliation
 Either wait for the scheduled job to run (every 5 minutes) or trigger it manually as an administrator:
-* **UI**: Go to the Admin Dashboard (login as `admin@linkz.com`) and click **Reconcile** next to the pending booking.
+* **UI**: Go to the Admin Dashboard (login as `admin@tpthinh.com`) and click **Reconcile** next to the pending booking.
 * **API**: Submit a POST request:
   ```bash
   curl -X POST http://localhost:8080/api/admin/reconcile/YOUR_BOOKING_ID \

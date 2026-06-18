@@ -1,9 +1,9 @@
-package com.linkz.seatreservation.web;
+package com.tpthinh.seatreservation.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
-import com.linkz.seatreservation.web.controller.PaymentNotificationController;
-import com.linkz.seatreservation.web.dto.PaymentNotificationDto;
+import com.tpthinh.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
+import com.tpthinh.seatreservation.web.controller.PaymentNotificationController;
+import com.tpthinh.seatreservation.web.dto.PaymentNotificationDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(PaymentNotificationController.class)
 @ActiveProfiles("test")
-@Import(com.linkz.seatreservation.web.config.SecurityConfig.class)
+@Import(com.tpthinh.seatreservation.web.config.SecurityConfig.class)
 class PaymentNotificationControllerTest {
 
     @Autowired

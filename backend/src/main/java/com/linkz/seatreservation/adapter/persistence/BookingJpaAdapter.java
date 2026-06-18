@@ -1,10 +1,10 @@
-package com.linkz.seatreservation.adapter.persistence;
+package com.tpthinh.seatreservation.adapter.persistence;
 
-import com.linkz.seatreservation.adapter.persistence.entity.BookingEntity;
-import com.linkz.seatreservation.adapter.persistence.mapper.EntityMapper;
-import com.linkz.seatreservation.adapter.persistence.repo.BookingJpaRepository;
-import com.linkz.seatreservation.business.domain.model.Booking;
-import com.linkz.seatreservation.business.port.external.BookingRepositoryPort;
+import com.tpthinh.seatreservation.adapter.persistence.entity.BookingEntity;
+import com.tpthinh.seatreservation.adapter.persistence.mapper.EntityMapper;
+import com.tpthinh.seatreservation.adapter.persistence.repo.BookingJpaRepository;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.port.external.BookingRepositoryPort;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;

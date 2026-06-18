@@ -1,11 +1,11 @@
-package com.linkz.seatreservation.adapter.persistence;
+package com.tpthinh.seatreservation.adapter.persistence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.adapter.persistence.entity.AuditLogEntity;
-import com.linkz.seatreservation.adapter.persistence.mapper.EntityMapper;
-import com.linkz.seatreservation.adapter.persistence.repo.AuditLogJpaRepository;
-import com.linkz.seatreservation.business.domain.model.AuditEntry;
-import com.linkz.seatreservation.business.port.external.AuditPort;
+import com.tpthinh.seatreservation.adapter.persistence.entity.AuditLogEntity;
+import com.tpthinh.seatreservation.adapter.persistence.mapper.EntityMapper;
+import com.tpthinh.seatreservation.adapter.persistence.repo.AuditLogJpaRepository;
+import com.tpthinh.seatreservation.business.domain.model.AuditEntry;
+import com.tpthinh.seatreservation.business.port.external.AuditPort;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import java.util.List;

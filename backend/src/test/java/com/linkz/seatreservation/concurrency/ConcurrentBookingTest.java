@@ -1,13 +1,13 @@
-package com.linkz.seatreservation.concurrency;
+package com.tpthinh.seatreservation.concurrency;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.business.port.in.ReconcilePaymentUseCase;
-import com.linkz.seatreservation.business.port.external.PaymentGatewayPort;
-import com.linkz.seatreservation.web.dto.BookingResponse;
-import com.linkz.seatreservation.web.dto.HoldSeatRequest;
-import com.linkz.seatreservation.web.dto.PaymentResponse;
-import com.linkz.seatreservation.web.dto.PaymentNotificationDto;
-import com.linkz.seatreservation.web.dto.response.SeatResponse;
+import com.tpthinh.seatreservation.business.port.in.ReconcilePaymentUseCase;
+import com.tpthinh.seatreservation.business.port.external.PaymentGatewayPort;
+import com.tpthinh.seatreservation.web.dto.BookingResponse;
+import com.tpthinh.seatreservation.web.dto.HoldSeatRequest;
+import com.tpthinh.seatreservation.web.dto.PaymentResponse;
+import com.tpthinh.seatreservation.web.dto.PaymentNotificationDto;
+import com.tpthinh.seatreservation.web.dto.response.SeatResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;

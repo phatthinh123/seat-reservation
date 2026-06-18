@@ -1,9 +1,9 @@
-package com.linkz.seatreservation.web.controller;
+package com.tpthinh.seatreservation.web.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.business.domain.exception.InvalidPaymentNotificationSignatureException;
-import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
-import com.linkz.seatreservation.web.dto.PaymentNotificationDto;
+import com.tpthinh.seatreservation.business.domain.exception.InvalidPaymentNotificationSignatureException;
+import com.tpthinh.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
+import com.tpthinh.seatreservation.web.dto.PaymentNotificationDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

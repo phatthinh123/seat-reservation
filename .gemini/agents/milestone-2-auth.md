@@ -20,8 +20,8 @@ A complete Keycloak realm JSON containing:
   - webOrigins: `["http://localhost:4200"]`
 - Realm roles: `USER`, `ADMIN`
 - Users:
-  - `user@linkz.com` / `User1234!` → assigned role `USER`
-  - `admin@linkz.com` / `Admin1234!` → assigned role `ADMIN`
+  - `user@tpthinh.com` / `User1234!` → assigned role `USER`
+  - `admin@tpthinh.com` / `Admin1234!` → assigned role `ADMIN`
 - Session settings:
   - `ssoSessionMaxLifespan`: 7776000 (90 days in seconds)
   - `ssoSessionIdleTimeout`: 7776000
@@ -141,9 +141,9 @@ docker compose up keycloak -d
 curl http://localhost:8180/realms/seat-reservation/.well-known/openid-configuration
 # Should return JSON with issuer = "http://localhost:8180/realms/seat-reservation"
 
-# 3. Get token for user@linkz.com
+# 3. Get token for user@tpthinh.com
 curl -X POST http://localhost:8180/realms/seat-reservation/protocol/openid-connect/token \
-  -d "client_id=seat-reservation-app&username=user@linkz.com&password=User1234!&grant_type=password"
+  -d "client_id=seat-reservation-app&username=user@tpthinh.com&password=User1234!&grant_type=password"
 # Copy the access_token
 
 # 4. Hit protected endpoint

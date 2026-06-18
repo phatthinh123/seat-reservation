@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.business.domain.model;
+package com.tpthinh.seatreservation.business.domain.model;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

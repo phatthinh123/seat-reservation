@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.business.port.in;
+package com.tpthinh.seatreservation.business.port.in;
 
 import java.util.UUID;
 

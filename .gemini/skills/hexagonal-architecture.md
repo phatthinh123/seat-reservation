@@ -3,7 +3,7 @@
 ## Package Layout (strict)
 
 ```
-com.linkz.seatreservation/
+com.tpthinh.seatreservation/
 ├── business/        ← CORE — zero framework dependencies
 │   ├── domain/      ← models, enums, exceptions (plain Java records/classes)
 │   ├── port/in/     ← use case interfaces (what web calls)

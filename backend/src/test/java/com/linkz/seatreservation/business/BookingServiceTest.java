@@ -1,14 +1,14 @@
-package com.linkz.seatreservation.business;
+package com.tpthinh.seatreservation.business;
 
-import com.linkz.seatreservation.business.domain.enums.BookingStatus;
-import com.linkz.seatreservation.business.domain.enums.SeatStatus;
-import com.linkz.seatreservation.business.domain.exception.SeatUnavailableException;
-import com.linkz.seatreservation.business.domain.model.Booking;
-import com.linkz.seatreservation.business.domain.model.Seat;
-import com.linkz.seatreservation.business.port.in.HoldSeatUseCase;
-import com.linkz.seatreservation.business.port.external.*;
-import com.linkz.seatreservation.business.service.BookingService;
-import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
+import com.tpthinh.seatreservation.business.domain.enums.BookingStatus;
+import com.tpthinh.seatreservation.business.domain.enums.SeatStatus;
+import com.tpthinh.seatreservation.business.domain.exception.SeatUnavailableException;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.model.Seat;
+import com.tpthinh.seatreservation.business.port.in.HoldSeatUseCase;
+import com.tpthinh.seatreservation.business.port.external.*;
+import com.tpthinh.seatreservation.business.service.BookingService;
+import com.tpthinh.seatreservation.business.domain.event.AuditEvents.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;

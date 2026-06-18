@@ -44,9 +44,9 @@
   },
   "users": [
     {
-      "username": "user@linkz.com",
+      "username": "user@tpthinh.com",
       "enabled": true,
-      "email": "user@linkz.com",
+      "email": "user@tpthinh.com",
       "firstName": "Regular",
       "lastName": "User",
       "credentials": [
@@ -59,9 +59,9 @@
       "realmRoles": ["USER"]
     },
     {
-      "username": "admin@linkz.com",
+      "username": "admin@tpthinh.com",
       "enabled": true,
-      "email": "admin@linkz.com",
+      "email": "admin@tpthinh.com",
       "firstName": "Admin",
       "lastName": "User",
       "credentials": [

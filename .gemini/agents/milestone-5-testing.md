@@ -12,7 +12,7 @@ for the business logic, and write the README so a reviewer can run the project i
 ## Tests to Write
 
 ### 1. ConcurrentBookingTest.java
-Path: `backend/src/test/java/com/linkz/seatreservation/concurrency/ConcurrentBookingTest.java`
+Path: `backend/src/test/java/com/tpthinh/seatreservation/concurrency/ConcurrentBookingTest.java`
 
 Use the pattern from `.gemini/skills/concurrency-patterns.md` exactly.
 Add Testcontainers annotations:
@@ -48,7 +48,7 @@ class ConcurrentBookingTest {
 ```
 
 ### 2. BookingServiceTest.java
-Path: `backend/src/test/java/com/linkz/seatreservation/business/BookingServiceTest.java`
+Path: `backend/src/test/java/com/tpthinh/seatreservation/business/BookingServiceTest.java`
 
 Pure unit test — NO Spring context, use Mockito:
 ```java
@@ -68,7 +68,7 @@ class BookingServiceTest {
 ```
 
 ### 3. WebhookServiceTest.java
-Path: `backend/src/test/java/com/linkz/seatreservation/business/WebhookServiceTest.java`
+Path: `backend/src/test/java/com/tpthinh/seatreservation/business/WebhookServiceTest.java`
 
 Test the state machine:
 ```java
@@ -83,7 +83,7 @@ class WebhookServiceTest {
 ```
 
 ### 4. WebhookControllerTest.java
-Path: `backend/src/test/java/com/linkz/seatreservation/web/WebhookControllerTest.java`
+Path: `backend/src/test/java/com/tpthinh/seatreservation/web/WebhookControllerTest.java`
 
 Test HMAC verification:
 ```java
@@ -140,8 +140,8 @@ docker compose up --build -d
 
 # Wait ~60s for Keycloak to start
 # Open http://localhost:4200
-# Login: user@linkz.com / User1234!
-# Admin: admin@linkz.com / Admin1234!
+# Login: user@tpthinh.com / User1234!
+# Admin: admin@tpthinh.com / Admin1234!
 ```
 
 ### Tech Stack table

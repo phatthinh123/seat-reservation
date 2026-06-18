@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.web.dto;
+package com.tpthinh.seatreservation.web.dto;
 
-import com.linkz.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;

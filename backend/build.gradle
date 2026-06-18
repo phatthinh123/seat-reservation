@@ -5,7 +5,7 @@ plugins {
     id 'org.flywaydb.flyway' version '9.22.3'
 }
 
-group = 'com.linkz'
+group = 'com.tpthinh'
 version = '0.0.1-SNAPSHOT'
 
 java {

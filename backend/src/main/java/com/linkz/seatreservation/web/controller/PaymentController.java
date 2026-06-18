@@ -1,8 +1,8 @@
-package com.linkz.seatreservation.web.controller;
+package com.tpthinh.seatreservation.web.controller;
 
-import com.linkz.seatreservation.business.domain.model.Payment;
-import com.linkz.seatreservation.business.port.in.InitiatePaymentUseCase;
-import com.linkz.seatreservation.web.dto.PaymentResponse;
+import com.tpthinh.seatreservation.business.domain.model.Payment;
+import com.tpthinh.seatreservation.business.port.in.InitiatePaymentUseCase;
+import com.tpthinh.seatreservation.web.dto.PaymentResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;

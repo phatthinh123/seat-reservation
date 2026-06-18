@@ -7,4 +7,4 @@ webhook:
 
 logging:
   level:
-    com.linkz: DEBUG
+    com.tpthinh: DEBUG

@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.adapter.persistence.repo;
+package com.tpthinh.seatreservation.adapter.persistence.repo;
 
-import com.linkz.seatreservation.adapter.persistence.entity.SeatEntity;
+import com.tpthinh.seatreservation.adapter.persistence.entity.SeatEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

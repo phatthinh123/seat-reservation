@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.adapter.audit;
+package com.tpthinh.seatreservation.adapter.audit;
 
-import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
-import com.linkz.seatreservation.business.port.external.AuditPort;
+import com.tpthinh.seatreservation.business.domain.event.AuditEvents.*;
+import com.tpthinh.seatreservation.business.port.external.AuditPort;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import java.util.Map;

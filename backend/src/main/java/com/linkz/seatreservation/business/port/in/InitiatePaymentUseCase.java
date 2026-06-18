@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.business.port.in;
+package com.tpthinh.seatreservation.business.port.in;
 
-import com.linkz.seatreservation.business.domain.model.Payment;
+import com.tpthinh.seatreservation.business.domain.model.Payment;
 import java.util.UUID;
 
 public interface InitiatePaymentUseCase {

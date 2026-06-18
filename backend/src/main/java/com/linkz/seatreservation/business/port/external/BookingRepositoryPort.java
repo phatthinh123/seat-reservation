@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.business.port.external;
+package com.tpthinh.seatreservation.business.port.external;
 
-import com.linkz.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;

@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.adapter.persistence.repo;
+package com.tpthinh.seatreservation.adapter.persistence.repo;
 
-import com.linkz.seatreservation.adapter.persistence.entity.PaymentTransactionEntity;
+import com.tpthinh.seatreservation.adapter.persistence.entity.PaymentTransactionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 import java.util.UUID;

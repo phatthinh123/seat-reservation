@@ -19,7 +19,7 @@ The UI must look **premium and professional**. Use:
 ## Pages to Build
 
 ### 1. `/login` — Login Page
-- Simple page with app branding "Linkz Seat Reservation"
+- Simple page with app branding "tpthinh Seat Reservation"
 - "Login with Keycloak" button → triggers Keycloak redirect
 - If already authenticated → redirect to `/seats`
 
@@ -165,7 +165,7 @@ docker compose up -d
 # 3. Open browser to http://localhost:4200
 # Should redirect to Keycloak login
 
-# 4. Login as user@linkz.com / User1234!
+# 4. Login as user@tpthinh.com / User1234!
 # Should see 3 seat cards
 
 # 5. Click "Hold Seat" on A1
@@ -178,7 +178,7 @@ docker compose up -d
 
 # 7. Return to seats — A1 should be RESERVED (red)
 
-# 8. Login as admin@linkz.com in new browser tab
+# 8. Login as admin@tpthinh.com in new browser tab
 # Navigate to /admin
 # Should see audit log with all events
 ```

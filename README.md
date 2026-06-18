@@ -61,8 +61,8 @@ docker compose up --build -d
 ```
 
 ### Development Credentials
-- **User Account**: `user@linkz.com` / `User1234!`
-- **Admin Account**: `admin@linkz.com` / `Admin1234!`
+- **User Account**: `user@tpthinh.com` / `User1234!`
+- **Admin Account**: `admin@tpthinh.com` / `Admin1234!`
 - **Keycloak Console**: `admin` / `admin` (at `http://localhost:8180`)
 
 ---

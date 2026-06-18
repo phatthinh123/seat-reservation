@@ -1,4 +1,4 @@
-package com.linkz.mockpayment;
+package com.tpthinh.mockpayment;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.adapter.persistence.repo;
+package com.tpthinh.seatreservation.adapter.persistence.repo;
 
-import com.linkz.seatreservation.adapter.persistence.entity.AuditLogEntity;
+import com.tpthinh.seatreservation.adapter.persistence.entity.AuditLogEntity;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

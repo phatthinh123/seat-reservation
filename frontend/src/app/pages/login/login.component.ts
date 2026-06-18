@@ -10,7 +10,7 @@ import { KeycloakService } from '../../core/auth/keycloak.service';
   template: `
     <div class="login-container">
       <div class="card login-card">
-        <h1 class="brand-title">⚡ Linkz Seat Reservation</h1>
+        <h1 class="brand-title">⚡ tpthinh Seat Reservation</h1>
         <p class="brand-subtitle">Reserve your seat securely and instantly.</p>
         <button class="btn btn-primary" (click)="login()">Login with Keycloak</button>
       </div>

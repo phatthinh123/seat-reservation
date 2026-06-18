@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.adapter.persistence.mapper;
+package com.tpthinh.seatreservation.adapter.persistence.mapper;
 
-import com.linkz.seatreservation.adapter.persistence.entity.*;
-import com.linkz.seatreservation.business.domain.model.*;
+import com.tpthinh.seatreservation.adapter.persistence.entity.*;
+import com.tpthinh.seatreservation.business.domain.model.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

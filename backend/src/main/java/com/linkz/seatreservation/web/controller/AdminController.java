@@ -1,10 +1,10 @@
-package com.linkz.seatreservation.web.controller;
+package com.tpthinh.seatreservation.web.controller;
 
-import com.linkz.seatreservation.business.port.in.GetAuditLogsUseCase;
-import com.linkz.seatreservation.business.port.in.GetPendingBookingsUseCase;
-import com.linkz.seatreservation.business.port.in.ReconcilePaymentUseCase;
-import com.linkz.seatreservation.web.dto.AdminBookingDto;
-import com.linkz.seatreservation.web.dto.AuditLogDto;
+import com.tpthinh.seatreservation.business.port.in.GetAuditLogsUseCase;
+import com.tpthinh.seatreservation.business.port.in.GetPendingBookingsUseCase;
+import com.tpthinh.seatreservation.business.port.in.ReconcilePaymentUseCase;
+import com.tpthinh.seatreservation.web.dto.AdminBookingDto;
+import com.tpthinh.seatreservation.web.dto.AuditLogDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;

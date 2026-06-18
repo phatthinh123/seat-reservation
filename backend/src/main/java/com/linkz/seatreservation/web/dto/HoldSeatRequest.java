@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.web.dto;
+package com.tpthinh.seatreservation.web.dto;
 
 import java.util.UUID;
 

@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.adapter.persistence.entity;
+package com.tpthinh.seatreservation.adapter.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

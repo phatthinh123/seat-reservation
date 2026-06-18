@@ -1,11 +1,11 @@
-package com.linkz.seatreservation.business;
+package com.tpthinh.seatreservation.business;
 
-import com.linkz.seatreservation.business.domain.enums.*;
-import com.linkz.seatreservation.business.domain.model.*;
-import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
-import com.linkz.seatreservation.business.port.external.*;
-import com.linkz.seatreservation.business.service.PaymentNotificationService;
-import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
+import com.tpthinh.seatreservation.business.domain.enums.*;
+import com.tpthinh.seatreservation.business.domain.model.*;
+import com.tpthinh.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
+import com.tpthinh.seatreservation.business.port.external.*;
+import com.tpthinh.seatreservation.business.service.PaymentNotificationService;
+import com.tpthinh.seatreservation.business.domain.event.AuditEvents.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;

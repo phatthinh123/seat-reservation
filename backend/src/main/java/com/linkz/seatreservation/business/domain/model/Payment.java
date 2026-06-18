@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.business.domain.model;
+package com.tpthinh.seatreservation.business.domain.model;
 
-import com.linkz.seatreservation.business.domain.enums.PaymentStatus;
+import com.tpthinh.seatreservation.business.domain.enums.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;

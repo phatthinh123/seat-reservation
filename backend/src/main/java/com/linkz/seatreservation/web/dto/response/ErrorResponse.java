@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.web.dto.response;
+package com.tpthinh.seatreservation.web.dto.response;
 
 import java.time.Instant;
 

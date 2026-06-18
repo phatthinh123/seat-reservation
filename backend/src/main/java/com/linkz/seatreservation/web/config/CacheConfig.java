@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.web.config;
+package com.tpthinh.seatreservation.web.config;
 
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;

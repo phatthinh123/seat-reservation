@@ -11,7 +11,7 @@ import { KeycloakService } from './core/auth/keycloak.service';
     <header class="app-header" *ngIf="isAuthenticated()">
       <div class="header-container">
         <div class="brand">
-          <span>⚡ Linkz Seat Reservation</span>
+          <span>⚡ tpthinh Seat Reservation</span>
         </div>
         <nav class="user-nav">
           <a class="logout-btn" routerLink="/seats" style="text-decoration: none;">Seats</a>

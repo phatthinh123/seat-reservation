@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.web.config;
+package com.tpthinh.seatreservation.web.config;
 
-import com.linkz.seatreservation.business.domain.exception.*;
-import com.linkz.seatreservation.web.dto.response.ErrorResponse;
+import com.tpthinh.seatreservation.business.domain.exception.*;
+import com.tpthinh.seatreservation.web.dto.response.ErrorResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;

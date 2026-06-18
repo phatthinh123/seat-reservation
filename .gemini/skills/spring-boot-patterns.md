@@ -202,5 +202,5 @@ server:
 
 logging:
   level:
-    com.linkz: DEBUG
+    com.tpthinh: DEBUG
 ```

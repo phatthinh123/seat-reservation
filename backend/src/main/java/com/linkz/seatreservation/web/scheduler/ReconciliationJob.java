@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.web.scheduler;
+package com.tpthinh.seatreservation.web.scheduler;
 
-import com.linkz.seatreservation.business.port.in.ReconcilePaymentUseCase;
+import com.tpthinh.seatreservation.business.port.in.ReconcilePaymentUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;

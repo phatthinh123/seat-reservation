@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.business.port.external;
+package com.tpthinh.seatreservation.business.port.external;
 
-import com.linkz.seatreservation.business.domain.model.Payment;
+import com.tpthinh.seatreservation.business.domain.model.Payment;
 import java.util.Optional;
 import java.util.UUID;
 

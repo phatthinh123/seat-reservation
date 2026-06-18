@@ -93,8 +93,8 @@ Navigate to **http://localhost:4200** in your browser.
 
 | User | Password | Role |
 |------|----------|------|
-| `user@linkz.com` | `User1234!` | USER — can view seats and make bookings |
-| `admin@linkz.com` | `Admin1234!` | ADMIN — can also view pending bookings, audit logs, and trigger reconciliation |
+| `user@tpthinh.com` | `User1234!` | USER — can view seats and make bookings |
+| `admin@tpthinh.com` | `Admin1234!` | ADMIN — can also view pending bookings, audit logs, and trigger reconciliation |
 
 ---
 

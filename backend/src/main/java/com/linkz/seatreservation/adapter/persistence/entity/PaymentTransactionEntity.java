@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.adapter.persistence.entity;
+package com.tpthinh.seatreservation.adapter.persistence.entity;
 
-import com.linkz.seatreservation.business.domain.enums.PaymentStatus;
-import com.linkz.seatreservation.business.domain.model.Payment;
+import com.tpthinh.seatreservation.business.domain.enums.PaymentStatus;
+import com.tpthinh.seatreservation.business.domain.model.Payment;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;

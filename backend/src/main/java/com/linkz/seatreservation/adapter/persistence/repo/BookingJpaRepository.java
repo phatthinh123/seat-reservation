@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.adapter.persistence.repo;
+package com.tpthinh.seatreservation.adapter.persistence.repo;
 
-import com.linkz.seatreservation.adapter.persistence.entity.BookingEntity;
+import com.tpthinh.seatreservation.adapter.persistence.entity.BookingEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -23,13 +23,13 @@ public interface BookingJpaRepository extends JpaRepository<BookingEntity, UUID>
     @Query("SELECT b FROM BookingEntity b WHERE b.id = (SELECT p.bookingId FROM PaymentTransactionEntity p WHERE p.externalPaymentId = :externalPaymentId)")
     Optional<BookingEntity> findByExternalPaymentIdForUpdate(@Param("externalPaymentId") String externalPaymentId);
 
-    @Query("SELECT b FROM BookingEntity b WHERE b.status = com.linkz.seatreservation.business.domain.enums.BookingStatus.PENDING AND b.holdExpiresAt <= :now")
+    @Query("SELECT b FROM BookingEntity b WHERE b.status = com.tpthinh.seatreservation.business.domain.enums.BookingStatus.PENDING AND b.holdExpiresAt <= :now")
     List<BookingEntity> findExpiredPending(@Param("now") LocalDateTime now);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT b FROM BookingEntity b WHERE b.status = com.linkz.seatreservation.business.domain.enums.BookingStatus.PENDING AND b.holdExpiresAt <= :now")
+    @Query("SELECT b FROM BookingEntity b WHERE b.status = com.tpthinh.seatreservation.business.domain.enums.BookingStatus.PENDING AND b.holdExpiresAt <= :now")
     List<BookingEntity> findExpiredPendingForUpdate(@Param("now") LocalDateTime now);
 
-    @Query("SELECT b FROM BookingEntity b WHERE b.status = com.linkz.seatreservation.business.domain.enums.BookingStatus.PENDING")
+    @Query("SELECT b FROM BookingEntity b WHERE b.status = com.tpthinh.seatreservation.business.domain.enums.BookingStatus.PENDING")
     List<BookingEntity> findAllPending();
 }

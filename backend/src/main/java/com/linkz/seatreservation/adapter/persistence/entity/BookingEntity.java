@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.adapter.persistence.entity;
+package com.tpthinh.seatreservation.adapter.persistence.entity;
 
-import com.linkz.seatreservation.business.domain.enums.BookingStatus;
-import com.linkz.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.enums.BookingStatus;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;

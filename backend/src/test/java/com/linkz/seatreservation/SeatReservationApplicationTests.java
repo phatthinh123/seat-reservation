@@ -1,4 +1,4 @@
-package com.linkz.seatreservation;
+package com.tpthinh.seatreservation;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;

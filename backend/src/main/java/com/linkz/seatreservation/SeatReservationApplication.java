@@ -1,4 +1,4 @@
-package com.linkz.seatreservation;
+package com.tpthinh.seatreservation;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

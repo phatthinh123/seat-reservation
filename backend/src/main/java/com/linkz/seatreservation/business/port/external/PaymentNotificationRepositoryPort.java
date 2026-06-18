@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.business.port.external;
+package com.tpthinh.seatreservation.business.port.external;
 
 import java.util.Optional;
 

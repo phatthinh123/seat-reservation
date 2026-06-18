@@ -1,14 +1,14 @@
-package com.linkz.seatreservation.web.controller;
+package com.tpthinh.seatreservation.web.controller;
 
-import com.linkz.seatreservation.business.domain.exception.BookingNotFoundException;
-import com.linkz.seatreservation.business.domain.exception.BookingNotOwnedException;
-import com.linkz.seatreservation.business.domain.model.Booking;
-import com.linkz.seatreservation.business.domain.model.Seat;
-import com.linkz.seatreservation.business.port.in.HoldSeatUseCase;
-import com.linkz.seatreservation.business.port.external.BookingRepositoryPort;
-import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
-import com.linkz.seatreservation.web.dto.HoldSeatRequest;
-import com.linkz.seatreservation.web.dto.BookingResponse;
+import com.tpthinh.seatreservation.business.domain.exception.BookingNotFoundException;
+import com.tpthinh.seatreservation.business.domain.exception.BookingNotOwnedException;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.model.Seat;
+import com.tpthinh.seatreservation.business.port.in.HoldSeatUseCase;
+import com.tpthinh.seatreservation.business.port.external.BookingRepositoryPort;
+import com.tpthinh.seatreservation.business.port.external.SeatRepositoryPort;
+import com.tpthinh.seatreservation.web.dto.HoldSeatRequest;
+import com.tpthinh.seatreservation.web.dto.BookingResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

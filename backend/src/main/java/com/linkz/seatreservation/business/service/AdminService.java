@@ -1,13 +1,13 @@
-package com.linkz.seatreservation.business.service;
+package com.tpthinh.seatreservation.business.service;
 
-import com.linkz.seatreservation.business.domain.model.AuditEntry;
-import com.linkz.seatreservation.business.domain.model.Booking;
-import com.linkz.seatreservation.business.domain.model.Seat;
-import com.linkz.seatreservation.business.port.in.GetAuditLogsUseCase;
-import com.linkz.seatreservation.business.port.in.GetPendingBookingsUseCase;
-import com.linkz.seatreservation.business.port.external.AuditPort;
-import com.linkz.seatreservation.business.port.external.BookingRepositoryPort;
-import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
+import com.tpthinh.seatreservation.business.domain.model.AuditEntry;
+import com.tpthinh.seatreservation.business.domain.model.Booking;
+import com.tpthinh.seatreservation.business.domain.model.Seat;
+import com.tpthinh.seatreservation.business.port.in.GetAuditLogsUseCase;
+import com.tpthinh.seatreservation.business.port.in.GetPendingBookingsUseCase;
+import com.tpthinh.seatreservation.business.port.external.AuditPort;
+import com.tpthinh.seatreservation.business.port.external.BookingRepositoryPort;
+import com.tpthinh.seatreservation.business.port.external.SeatRepositoryPort;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;

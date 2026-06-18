@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.web.controller;
+package com.tpthinh.seatreservation.web.controller;
 
-import com.linkz.seatreservation.business.port.in.GetSeatsUseCase;
-import com.linkz.seatreservation.web.dto.response.SeatResponse;
+import com.tpthinh.seatreservation.business.port.in.GetSeatsUseCase;
+import com.tpthinh.seatreservation.web.dto.response.SeatResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

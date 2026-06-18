@@ -1,6 +1,6 @@
-package com.linkz.seatreservation.business.domain.model;
+package com.tpthinh.seatreservation.business.domain.model;
 
-import com.linkz.seatreservation.business.domain.enums.SeatStatus;
+import com.tpthinh.seatreservation.business.domain.enums.SeatStatus;
 import java.util.UUID;
 
 public record Seat(

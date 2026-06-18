@@ -14,7 +14,7 @@ webhook processing, reconciliation, and audit log.
 ## Package Structure to Create
 
 ```
-backend/src/main/java/com/linkz/seatreservation/
+backend/src/main/java/com/tpthinh/seatreservation/
 ├── business/
 │   ├── domain/model/     Seat, Booking, Payment, AuditEntry
 │   ├── domain/enums/     SeatStatus, BookingStatus, PaymentStatus
@@ -85,7 +85,7 @@ Key points:
 - Return 200 OK always (even on late arrival)
 
 ### Mock Payment Service
-Implement in `mock-payment-service/src/main/java/com/linkz/mockpayment/`:
+Implement in `mock-payment-service/src/main/java/com/tpthinh/mockpayment/`:
 
 `PaymentController.java`:
 ```java
@@ -159,7 +159,7 @@ GET  /api/admin/audit-logs?entityType=&action=&limit=50  → pageable audit quer
 ```bash
 # 1. Full booking flow via curl
 TOKEN=$(curl -s -X POST http://localhost:8180/realms/seat-reservation/protocol/openid-connect/token \
-  -d "client_id=seat-reservation-app&username=user@linkz.com&password=User1234!&grant_type=password" \
+  -d "client_id=seat-reservation-app&username=user@tpthinh.com&password=User1234!&grant_type=password" \
   | jq -r .access_token)
 
 # Hold a seat
@@ -187,7 +187,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/seats | jq .
 
 # 2. Verify audit log
 ADMIN_TOKEN=$(curl -s -X POST http://localhost:8180/.../token \
-  -d "...username=admin@linkz.com&password=Admin1234!..." | jq -r .access_token)
+  -d "...username=admin@tpthinh.com&password=Admin1234!..." | jq -r .access_token)
 
 curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
   "http://localhost:8080/api/admin/audit-logs?limit=20" | jq .

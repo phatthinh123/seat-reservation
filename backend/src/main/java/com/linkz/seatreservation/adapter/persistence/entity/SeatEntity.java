@@ -1,7 +1,7 @@
-package com.linkz.seatreservation.adapter.persistence.entity;
+package com.tpthinh.seatreservation.adapter.persistence.entity;
 
-import com.linkz.seatreservation.business.domain.enums.SeatStatus;
-import com.linkz.seatreservation.business.domain.model.Seat;
+import com.tpthinh.seatreservation.business.domain.enums.SeatStatus;
+import com.tpthinh.seatreservation.business.domain.model.Seat;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;

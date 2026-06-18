@@ -1,9 +1,9 @@
-package com.linkz.seatreservation.business.service;
+package com.tpthinh.seatreservation.business.service;
 
-import com.linkz.seatreservation.business.domain.model.Seat;
-import com.linkz.seatreservation.business.port.in.GetSeatsUseCase;
-import com.linkz.seatreservation.business.port.external.CachePort;
-import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
+import com.tpthinh.seatreservation.business.domain.model.Seat;
+import com.tpthinh.seatreservation.business.port.in.GetSeatsUseCase;
+import com.tpthinh.seatreservation.business.port.external.CachePort;
+import com.tpthinh.seatreservation.business.port.external.SeatRepositoryPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

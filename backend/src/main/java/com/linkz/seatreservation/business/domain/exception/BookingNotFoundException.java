@@ -1,4 +1,4 @@
-package com.linkz.seatreservation.business.domain.exception;
+package com.tpthinh.seatreservation.business.domain.exception;
 
 public class BookingNotFoundException extends RuntimeException {
     public BookingNotFoundException(String message) {
