@@ -6,7 +6,7 @@ import com.linkz.seatreservation.business.port.external.PaymentGatewayPort;
 import com.linkz.seatreservation.web.dto.BookingResponse;
 import com.linkz.seatreservation.web.dto.HoldSeatRequest;
 import com.linkz.seatreservation.web.dto.PaymentResponse;
-import com.linkz.seatreservation.web.dto.WebhookEventDto;
+import com.linkz.seatreservation.web.dto.PaymentNotificationDto;
 import com.linkz.seatreservation.web.dto.response.SeatResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
@@ -254,7 +254,7 @@ public class ConcurrentBookingTest {
         String paymentId = payResp.getBody().paymentId();
 
         String webhookBody = objectMapper.writeValueAsString(
-            new WebhookEventDto("evt-dup-123", paymentId, bookingId.toString(), "SUCCESS")
+            new PaymentNotificationDto("evt-dup-123", paymentId, bookingId.toString(), "SUCCESS")
         );
         String signature = hmacSha256(webhookBody, "test-secret");
         HttpHeaders webhookHeaders = new HttpHeaders();
@@ -270,7 +270,7 @@ public class ConcurrentBookingTest {
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         int webhookRows = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM webhook_events WHERE event_id = 'evt-dup-123'",
+            "SELECT count(*) FROM payment_notifications WHERE event_id = 'evt-dup-123'",
             Integer.class
         );
         assertThat(webhookRows).isEqualTo(2); // first=PROCESSED, second=DUPLICATE

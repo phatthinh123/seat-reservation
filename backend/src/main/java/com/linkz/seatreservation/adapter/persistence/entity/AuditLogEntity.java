@@ -45,22 +45,4 @@ public class AuditLogEntity {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
-    
-    public AuditEntry toDomain() {
-        return new AuditEntry(id, actor, action, entityType, entityId, beforeState, afterState, createdAt);
-    }
-    
-    public static AuditLogEntity fromDomain(AuditEntry entry) {
-        if (entry == null) return null;
-        return AuditLogEntity.builder()
-            .id(entry.id())
-            .actor(entry.actor())
-            .action(entry.action())
-            .entityType(entry.entityType())
-            .entityId(entry.entityId())
-            .beforeState(entry.beforeState())
-            .afterState(entry.afterState())
-            .createdAt(entry.createdAt())
-            .build();
-    }
 }

@@ -1,9 +1,9 @@
 package com.linkz.seatreservation.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
+import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
 import com.linkz.seatreservation.web.controller.PaymentNotificationController;
-import com.linkz.seatreservation.web.dto.WebhookEventDto;
+import com.linkz.seatreservation.web.dto.PaymentNotificationDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Slice test for PaymentNotificationController — verifies HMAC signature enforcement at the HTTP layer.
- * No business logic is exercised here; HandleWebhookUseCase is mocked.
+ * No business logic is exercised here; HandlePaymentNotificationUseCase is mocked.
  *
  * All tests follow BDD structure:
  *   // Given — set up preconditions
@@ -45,7 +45,7 @@ class PaymentNotificationControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private HandleWebhookUseCase handleWebhookUseCase;
+    private HandlePaymentNotificationUseCase handleNotificationUseCase;
 
     @MockBean
     private JwtDecoder jwtDecoder;
@@ -62,11 +62,11 @@ class PaymentNotificationControllerTest {
     @Test
     void testWebhook_validHmacSignature_shouldReturn200() throws Exception {
         // Given — a well-formed webhook payload with a correct HMAC signature
-        WebhookEventDto dto = new WebhookEventDto("evt-ok", "pay-ok", UUID.randomUUID().toString(), "SUCCESS");
+        PaymentNotificationDto dto = new PaymentNotificationDto("evt-ok", "pay-ok", UUID.randomUUID().toString(), "SUCCESS");
         String body = objectMapper.writeValueAsString(dto);
         String signature = hmacSha256(body, testSecret);
 
-        doNothing().when(handleWebhookUseCase).handleWebhook(any());
+        doNothing().when(handleNotificationUseCase).handleNotification(any());
 
         // When / Then — request with valid signature → 200 OK
         mockMvc.perform(post("/api/webhooks/payment")
@@ -87,7 +87,7 @@ class PaymentNotificationControllerTest {
     @Test
     void testWebhook_invalidHmacSignature_shouldReturn400() throws Exception {
         // Given — a real payload but a deliberately wrong signature
-        WebhookEventDto dto = new WebhookEventDto("evt-bad", "pay-bad", UUID.randomUUID().toString(), "SUCCESS");
+        PaymentNotificationDto dto = new PaymentNotificationDto("evt-bad", "pay-bad", UUID.randomUUID().toString(), "SUCCESS");
         String body = objectMapper.writeValueAsString(dto);
         String tamperedSignature = "deadbeefdeadbeef";
 
@@ -107,7 +107,7 @@ class PaymentNotificationControllerTest {
     @Test
     void testWebhook_missingSignatureHeader_shouldReturn400() throws Exception {
         // Given — a real payload but no X-Signature header
-        WebhookEventDto dto = new WebhookEventDto("evt-nosig", "pay-nosig", UUID.randomUUID().toString(), "SUCCESS");
+        PaymentNotificationDto dto = new PaymentNotificationDto("evt-nosig", "pay-nosig", UUID.randomUUID().toString(), "SUCCESS");
         String body = objectMapper.writeValueAsString(dto);
 
         // When / Then — request without X-Signature → 400 Bad Request

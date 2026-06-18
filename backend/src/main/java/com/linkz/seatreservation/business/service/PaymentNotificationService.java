@@ -2,35 +2,35 @@ package com.linkz.seatreservation.business.service;
 
 import com.linkz.seatreservation.business.domain.enums.*;
 import com.linkz.seatreservation.business.domain.model.*;
-import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
+import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
 import com.linkz.seatreservation.business.port.external.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.util.Map;
 
 @Service
-public class WebhookService implements HandleWebhookUseCase {
+public class PaymentNotificationService implements HandlePaymentNotificationUseCase {
     private final BookingRepositoryPort bookingRepo;
     private final SeatRepositoryPort seatRepo;
     private final PaymentRepositoryPort paymentRepo;
-    private final WebhookEventRepositoryPort webhookEventRepo;
+    private final PaymentNotificationRepositoryPort paymentNotificationRepo;
     private final PaymentGatewayPort paymentGateway;
     private final CachePort cachePort;
     private final AuditPort auditPort;
     private final TransactionTemplate transactionTemplate;
 
-    public WebhookService(BookingRepositoryPort bookingRepo,
-                          SeatRepositoryPort seatRepo,
-                          PaymentRepositoryPort paymentRepo,
-                          WebhookEventRepositoryPort webhookEventRepo,
-                          PaymentGatewayPort paymentGateway,
-                          CachePort cachePort,
-                          AuditPort auditPort,
-                          TransactionTemplate transactionTemplate) {
+    public PaymentNotificationService(BookingRepositoryPort bookingRepo,
+                                      SeatRepositoryPort seatRepo,
+                                      PaymentRepositoryPort paymentRepo,
+                                      PaymentNotificationRepositoryPort paymentNotificationRepo,
+                                      PaymentGatewayPort paymentGateway,
+                                      CachePort cachePort,
+                                      AuditPort auditPort,
+                                      TransactionTemplate transactionTemplate) {
         this.bookingRepo = bookingRepo;
         this.seatRepo = seatRepo;
         this.paymentRepo = paymentRepo;
-        this.webhookEventRepo = webhookEventRepo;
+        this.paymentNotificationRepo = paymentNotificationRepo;
         this.paymentGateway = paymentGateway;
         this.cachePort = cachePort;
         this.auditPort = auditPort;
@@ -38,23 +38,21 @@ public class WebhookService implements HandleWebhookUseCase {
     }
 
     @Override
-    public void handleWebhook(WebhookEventCommand cmd) {
+    public void handleNotification(PaymentNotificationCommand cmd) {
         // Step 1: Check if the event was already processed or marked duplicate
-        java.util.Optional<String> existingStatus = webhookEventRepo.findStatusByEventId(cmd.eventId());
+        java.util.Optional<String> existingStatus = paymentNotificationRepo.findStatusByEventId(cmd.eventId());
         if (existingStatus.isPresent()) {
             String status = existingStatus.get();
             if ("PROCESSED".equals(status) || "DUPLICATE".equals(status)) {
                 auditPort.log("system", "WEBHOOK_DUPLICATE", "WEBHOOK", cmd.eventId(), null, 
                     auditDetails("Duplicate event ID checked", cmd.eventId(), cmd.rawPayload()));
-                webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "DUPLICATE", "Duplicate event detected");
+                paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "DUPLICATE", "Duplicate event detected");
                 return;
             }
         }
 
-        // Step 2: Persist raw payload to webhook_events IMMEDIATELY — before ANY logic.
-        // This is the "persist-first" invariant: if the process crashes at any point after
-        // this line, the raw event is still on disk and can be replayed during reconciliation.
-        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "RECEIVED", null);
+        // Step 2: Persist raw payload to database IMMEDIATELY — before ANY logic.
+        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "RECEIVED", null);
         auditPort.log("system", "WEBHOOK_RECEIVED", "WEBHOOK", cmd.eventId(), null, cmd.rawPayload());
 
         try {
@@ -81,7 +79,7 @@ public class WebhookService implements HandleWebhookUseCase {
                         if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
                             handleLateArrival(booking, payment, cmd);
                         } else {
-                            webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
+                            paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
                             auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, 
                                 auditDetails("Failed payment for already expired/cancelled booking", cmd.eventId(), cmd.rawPayload()));
                         }
@@ -91,17 +89,17 @@ public class WebhookService implements HandleWebhookUseCase {
                         dupDetails.put("message", "Duplicate webhook for confirmed booking");
                         dupDetails.put("rawPayload", cmd.rawPayload());
                         auditPort.log("system", "WEBHOOK_DUPLICATE", "BOOKING", booking.id().toString(), booking, dupDetails);
-                        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", "Duplicate webhook for confirmed booking");
+                        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", "Duplicate webhook for confirmed booking");
                     }
                 }
             });
         } catch (Exception e) {
-            webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "FAILED", e.getMessage());
+            paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "FAILED", e.getMessage());
             throw e;
         }
     }
 
-    private void confirmBooking(Booking booking, Seat seat, Payment payment, WebhookEventCommand cmd) {
+    private void confirmBooking(Booking booking, Seat seat, Payment payment, PaymentNotificationCommand cmd) {
         Booking confirmedBooking = new Booking(
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CONFIRMED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
@@ -117,9 +115,8 @@ public class WebhookService implements HandleWebhookUseCase {
         );
         paymentRepo.save(successPayment);
 
-        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
+        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
-        // Write-through cache updates (keeping hold/idempotency metadata in the reserved seat cache)
         Seat cachedSeatWithHoldInfo = new Seat(
             savedSeat != null ? savedSeat.id() : seat.id(),
             savedSeat != null ? savedSeat.label() : seat.label(),
@@ -137,7 +134,7 @@ public class WebhookService implements HandleWebhookUseCase {
         auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Booking confirmed", cmd.eventId(), cmd.rawPayload()));
     }
 
-    private void failBooking(Booking booking, Seat seat, Payment payment, WebhookEventCommand cmd) {
+    private void failBooking(Booking booking, Seat seat, Payment payment, PaymentNotificationCommand cmd) {
         Booking cancelledBooking = new Booking(
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CANCELLED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
@@ -153,47 +150,32 @@ public class WebhookService implements HandleWebhookUseCase {
         );
         paymentRepo.save(failedPayment);
 
-        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
+        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
-        // Write-through cache updates
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
 
         auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", cancelledBooking, cmd.eventId()));
         auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));
         auditPort.log("system", "PAYMENT_FAILED", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", failedPayment, cmd.eventId()));
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Booking cancelled due to payment failure", cmd.eventId(), cmd.rawPayload()));
+        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Payment failed", cmd.eventId(), cmd.rawPayload()));
     }
 
-    private void handleLateArrival(Booking booking, Payment payment, WebhookEventCommand cmd) {
-        auditPort.log("system", "WEBHOOK_LATE_ARRIVAL", "BOOKING", booking.id().toString(), booking, auditDetails("booking", booking, cmd.eventId()));
-
+    private void handleLateArrival(Booking booking, Payment payment, PaymentNotificationCommand cmd) {
         Payment refundedPayment = new Payment(
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
             PaymentStatus.REFUNDED, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
         );
         paymentRepo.save(refundedPayment);
 
-        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", "Late arrival refund triggered");
+        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
-        auditPort.log("system", "REFUND_INITIATED", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", refundedPayment, cmd.eventId()));
+        auditPort.log("system", "REFUND_INITIATED", "PAYMENT", payment.id().toString(), payment, auditDetails("refund_initiated", refundedPayment, cmd.eventId()));
         paymentGateway.refund(payment.externalPaymentId());
-        
-        auditPort.log("system", "REFUND_COMPLETED", "PAYMENT", payment.id().toString(), refundedPayment, auditDetails("payment", refundedPayment, cmd.eventId()));
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Late arrival auto-refund completed", cmd.eventId(), cmd.rawPayload()));
+        auditPort.log("system", "REFUND_COMPLETED", "PAYMENT", payment.id().toString(), payment, auditDetails("refund_completed", refundedPayment, cmd.eventId()));
+        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Late arrival payment refunded", cmd.eventId(), cmd.rawPayload()));
     }
 
-    private Map<String, Object> auditDetails(String message, String eventId, String rawPayload) {
-        Map<String, Object> details = new java.util.HashMap<>();
-        details.put("message", message);
-        details.put("eventId", eventId);
-        details.put("rawPayload", rawPayload);
-        return details;
-    }
-
-    private Map<String, Object> auditDetails(Object dataKey, Object dataValue, String eventId) {
-        Map<String, Object> details = new java.util.HashMap<>();
-        details.put(String.valueOf(dataKey), dataValue);
-        details.put("triggerEventId", eventId);
-        return details;
+    private Map<String, Object> auditDetails(String name, Object value, String eventId) {
+        return new java.util.HashMap<>(Map.of(name, value, "triggerEventId", eventId));
     }
 }

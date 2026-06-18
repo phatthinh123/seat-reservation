@@ -1,6 +1,7 @@
 package com.linkz.seatreservation.adapter.persistence;
 
 import com.linkz.seatreservation.adapter.persistence.entity.PaymentTransactionEntity;
+import com.linkz.seatreservation.adapter.persistence.mapper.EntityMapper;
 import com.linkz.seatreservation.adapter.persistence.repo.PaymentJpaRepository;
 import com.linkz.seatreservation.business.domain.model.Payment;
 import com.linkz.seatreservation.business.port.external.PaymentRepositoryPort;
@@ -11,29 +12,31 @@ import java.util.UUID;
 @Component
 public class PaymentJpaAdapter implements PaymentRepositoryPort {
     private final PaymentJpaRepository repository;
+    private final EntityMapper mapper;
 
-    public PaymentJpaAdapter(PaymentJpaRepository repository) {
+    public PaymentJpaAdapter(PaymentJpaRepository repository, EntityMapper mapper) {
         this.repository = repository;
+        this.mapper = mapper;
     }
 
     @Override
     public Payment save(Payment payment) {
-        PaymentTransactionEntity entity = PaymentTransactionEntity.fromDomain(payment);
-        return repository.save(entity).toDomain();
+        PaymentTransactionEntity entity = mapper.fromDomain(payment);
+        return mapper.toDomain(repository.save(entity));
     }
 
     @Override
     public Optional<Payment> findById(UUID id) {
-        return repository.findById(id).map(PaymentTransactionEntity::toDomain);
+        return repository.findById(id).map(mapper::toDomain);
     }
 
     @Override
     public Optional<Payment> findByBookingId(UUID bookingId) {
-        return repository.findByBookingId(bookingId).map(PaymentTransactionEntity::toDomain);
+        return repository.findByBookingId(bookingId).map(mapper::toDomain);
     }
 
     @Override
     public Optional<Payment> findByExternalPaymentId(String externalPaymentId) {
-        return repository.findByExternalPaymentId(externalPaymentId).map(PaymentTransactionEntity::toDomain);
+        return repository.findByExternalPaymentId(externalPaymentId).map(mapper::toDomain);
     }
 }

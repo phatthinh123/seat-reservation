@@ -1,9 +1,9 @@
 package com.linkz.seatreservation.web.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkz.seatreservation.business.domain.exception.InvalidWebhookSignatureException;
-import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
-import com.linkz.seatreservation.web.dto.WebhookEventDto;
+import com.linkz.seatreservation.business.domain.exception.InvalidPaymentNotificationSignatureException;
+import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
+import com.linkz.seatreservation.web.dto.PaymentNotificationDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,14 +21,14 @@ import java.util.HexFormat;
 public class PaymentNotificationController {
     private static final Logger log = LoggerFactory.getLogger(PaymentNotificationController.class);
 
-    private final HandleWebhookUseCase handleWebhookUseCase;
+    private final HandlePaymentNotificationUseCase handleNotificationUseCase;
     private final ObjectMapper objectMapper;
 
     @Value("${webhook.secret:local-dev-secret}")
     private String webhookSecret;
 
-    public PaymentNotificationController(HandleWebhookUseCase handleWebhookUseCase, ObjectMapper objectMapper) {
-        this.handleWebhookUseCase = handleWebhookUseCase;
+    public PaymentNotificationController(HandlePaymentNotificationUseCase handleNotificationUseCase, ObjectMapper objectMapper) {
+        this.handleNotificationUseCase = handleNotificationUseCase;
         this.objectMapper = objectMapper;
     }
 
@@ -37,27 +37,27 @@ public class PaymentNotificationController {
             @RequestHeader("X-Signature") String signature,
             @RequestBody String rawBody) {
         
-        log.info("Received payment webhook with signature: {}", signature);
+        log.info("Received payment notification webhook with signature: {}", signature);
 
         String expected = hmacSha256(rawBody, webhookSecret);
         if (signature == null || !MessageDigest.isEqual(expected.getBytes(), signature.getBytes())) {
-            log.error("Invalid webhook signature. Expected {}, got {}", expected, signature);
-            throw new InvalidWebhookSignatureException("Webhook signature verification failed");
+            log.error("Invalid payment notification signature. Expected {}, got {}", expected, signature);
+            throw new InvalidPaymentNotificationSignatureException("Webhook signature verification failed");
         }
 
         try {
-            WebhookEventDto event = objectMapper.readValue(rawBody, WebhookEventDto.class);
-            HandleWebhookUseCase.WebhookEventCommand cmd = new HandleWebhookUseCase.WebhookEventCommand(
+            PaymentNotificationDto event = objectMapper.readValue(rawBody, PaymentNotificationDto.class);
+            HandlePaymentNotificationUseCase.PaymentNotificationCommand cmd = new HandlePaymentNotificationUseCase.PaymentNotificationCommand(
                 event.eventId(),
                 event.paymentId(),
                 event.bookingId(),
                 event.status(),
                 rawBody
             );
-            handleWebhookUseCase.handleWebhook(cmd);
+            handleNotificationUseCase.handleNotification(cmd);
         } catch (Exception e) {
-            log.error("Error processing webhook: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to process webhook: " + e.getMessage(), e);
+            log.error("Error processing payment notification: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to process payment notification: " + e.getMessage(), e);
         }
 
         return ResponseEntity.ok().build();

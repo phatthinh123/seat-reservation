@@ -1,6 +1,6 @@
 package com.linkz.seatreservation.web.dto;
 
-public record WebhookEventDto(
+public record PaymentNotificationDto(
     String eventId,
     String paymentId,
     String bookingId,

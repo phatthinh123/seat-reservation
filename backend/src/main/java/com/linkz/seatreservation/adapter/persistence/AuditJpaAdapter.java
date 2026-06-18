@@ -2,6 +2,7 @@ package com.linkz.seatreservation.adapter.persistence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkz.seatreservation.adapter.persistence.entity.AuditLogEntity;
+import com.linkz.seatreservation.adapter.persistence.mapper.EntityMapper;
 import com.linkz.seatreservation.adapter.persistence.repo.AuditLogJpaRepository;
 import com.linkz.seatreservation.business.domain.model.AuditEntry;
 import com.linkz.seatreservation.business.port.external.AuditPort;
@@ -12,10 +13,12 @@ import java.util.List;
 @Component
 public class AuditJpaAdapter implements AuditPort {
     private final AuditLogJpaRepository repository;
+    private final EntityMapper mapper;
     private final ObjectMapper objectMapper;
 
-    public AuditJpaAdapter(AuditLogJpaRepository repository, ObjectMapper objectMapper) {
+    public AuditJpaAdapter(AuditLogJpaRepository repository, EntityMapper mapper, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.mapper = mapper;
         this.objectMapper = objectMapper;
     }
 
@@ -39,7 +42,7 @@ public class AuditJpaAdapter implements AuditPort {
     public List<AuditEntry> queryLogs(String entityType, String action, int limit) {
         return repository.queryLogs(entityType, action, PageRequest.of(0, limit))
             .stream()
-            .map(AuditLogEntity::toDomain)
+            .map(mapper::toDomain)
             .toList();
     }
 

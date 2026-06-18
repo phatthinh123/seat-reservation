@@ -42,8 +42,8 @@ public class GlobalExceptionHandler {
             .body(new ErrorResponse("BOOKING_ALREADY_PAID", e.getMessage(), Instant.now()));
     }
 
-    @ExceptionHandler(InvalidWebhookSignatureException.class)
-    public ResponseEntity<ErrorResponse> onInvalidWebhookSignature(InvalidWebhookSignatureException e) {
+    @ExceptionHandler(InvalidPaymentNotificationSignatureException.class)
+    public ResponseEntity<ErrorResponse> onInvalidPaymentNotificationSignature(InvalidPaymentNotificationSignatureException e) {
         return ResponseEntity.status(400)
             .body(new ErrorResponse("INVALID_WEBHOOK_SIGNATURE", e.getMessage(), Instant.now()));
     }

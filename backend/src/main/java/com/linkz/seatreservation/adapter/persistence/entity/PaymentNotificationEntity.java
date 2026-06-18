@@ -6,13 +6,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "webhook_events")
+@Table(name = "payment_notifications")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WebhookEventEntity {
+public class PaymentNotificationEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;

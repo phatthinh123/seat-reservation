@@ -50,22 +50,4 @@ public class PaymentTransactionEntity {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
-    
-    public Payment toDomain() {
-        return new Payment(id, bookingId, externalPaymentId, amount, status, rawPayload, createdAt, updatedAt);
-    }
-    
-    public static PaymentTransactionEntity fromDomain(Payment payment) {
-        if (payment == null) return null;
-        return PaymentTransactionEntity.builder()
-            .id(payment.id())
-            .bookingId(payment.bookingId())
-            .externalPaymentId(payment.externalPaymentId())
-            .amount(payment.amount())
-            .status(payment.status())
-            .rawPayload(payment.rawPayload())
-            .createdAt(payment.createdAt())
-            .updatedAt(payment.updatedAt())
-            .build();
-    }
 }

@@ -50,22 +50,4 @@ public class BookingEntity {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
-    
-    public Booking toDomain() {
-        return new Booking(id, userId, seatId, status, idempotencyKey, holdExpiresAt, createdAt, updatedAt);
-    }
-    
-    public static BookingEntity fromDomain(Booking booking) {
-        if (booking == null) return null;
-        return BookingEntity.builder()
-            .id(booking.id())
-            .userId(booking.userId())
-            .seatId(booking.seatId())
-            .status(booking.status())
-            .idempotencyKey(booking.idempotencyKey())
-            .holdExpiresAt(booking.holdExpiresAt())
-            .createdAt(booking.createdAt())
-            .updatedAt(booking.updatedAt())
-            .build();
-    }
 }

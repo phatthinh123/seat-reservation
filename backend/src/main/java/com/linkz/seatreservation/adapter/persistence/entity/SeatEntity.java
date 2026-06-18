@@ -25,18 +25,4 @@ public class SeatEntity {
     
     @Version
     private Long version;
-    
-    public Seat toDomain() {
-        return new Seat(id, label, status, version);
-    }
-    
-    public static SeatEntity fromDomain(Seat seat) {
-        if (seat == null) return null;
-        return SeatEntity.builder()
-            .id(seat.id())
-            .label(seat.label())
-            .status(seat.status())
-            .version(seat.version())
-            .build();
-    }
 }
