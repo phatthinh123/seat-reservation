@@ -18,8 +18,8 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 
 @RestController
-public class WebhookController {
-    private static final Logger log = LoggerFactory.getLogger(WebhookController.class);
+public class PaymentNotificationController {
+    private static final Logger log = LoggerFactory.getLogger(PaymentNotificationController.class);
 
     private final HandleWebhookUseCase handleWebhookUseCase;
     private final ObjectMapper objectMapper;
@@ -27,7 +27,7 @@ public class WebhookController {
     @Value("${webhook.secret:local-dev-secret}")
     private String webhookSecret;
 
-    public WebhookController(HandleWebhookUseCase handleWebhookUseCase, ObjectMapper objectMapper) {
+    public PaymentNotificationController(HandleWebhookUseCase handleWebhookUseCase, ObjectMapper objectMapper) {
         this.handleWebhookUseCase = handleWebhookUseCase;
         this.objectMapper = objectMapper;
     }

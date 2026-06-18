@@ -2,7 +2,7 @@ package com.linkz.seatreservation.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkz.seatreservation.business.port.in.HandleWebhookUseCase;
-import com.linkz.seatreservation.web.controller.WebhookController;
+import com.linkz.seatreservation.web.controller.PaymentNotificationController;
 import com.linkz.seatreservation.web.dto.WebhookEventDto;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Slice test for WebhookController — verifies HMAC signature enforcement at the HTTP layer.
+ * Slice test for PaymentNotificationController — verifies HMAC signature enforcement at the HTTP layer.
  * No business logic is exercised here; HandleWebhookUseCase is mocked.
  *
  * All tests follow BDD structure:
@@ -33,10 +33,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   // When  — perform the HTTP request
  *   // Then  — assert the expected HTTP response code
  */
-@WebMvcTest(WebhookController.class)
+@WebMvcTest(PaymentNotificationController.class)
 @ActiveProfiles("test")
 @Import(com.linkz.seatreservation.web.config.SecurityConfig.class)
-class WebhookControllerTest {
+class PaymentNotificationControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
