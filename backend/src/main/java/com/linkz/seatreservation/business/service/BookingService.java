@@ -7,11 +7,12 @@ import com.linkz.seatreservation.business.domain.exception.SeatUnavailableExcept
 import com.linkz.seatreservation.business.domain.model.Booking;
 import com.linkz.seatreservation.business.domain.model.Seat;
 import com.linkz.seatreservation.business.port.in.HoldSeatUseCase;
-import com.linkz.seatreservation.business.port.external.AuditPort;
+import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
 import com.linkz.seatreservation.business.port.external.BookingRepositoryPort;
 import com.linkz.seatreservation.business.port.external.CachePort;
 import com.linkz.seatreservation.business.port.external.DistributedLockPort;
 import com.linkz.seatreservation.business.port.external.SeatRepositoryPort;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
@@ -24,20 +25,20 @@ public class BookingService implements HoldSeatUseCase {
     private final BookingRepositoryPort bookingRepo;
     private final DistributedLockPort lockPort;
     private final CachePort cachePort;
-    private final AuditPort auditPort;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
     public BookingService(SeatRepositoryPort seatRepo,
                           BookingRepositoryPort bookingRepo,
                           DistributedLockPort lockPort,
                           CachePort cachePort,
-                          AuditPort auditPort,
+                          ApplicationEventPublisher eventPublisher,
                           TransactionTemplate transactionTemplate) {
         this.seatRepo = seatRepo;
         this.bookingRepo = bookingRepo;
         this.lockPort = lockPort;
         this.cachePort = cachePort;
-        this.auditPort = auditPort;
+        this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -104,8 +105,8 @@ public class BookingService implements HoldSeatUseCase {
                     );
                     Booking savedBooking = bookingRepo.save(newBooking);
 
-                    auditPort.log("system", "SEAT_HELD", "SEAT", seat.id().toString(), seat, savedSeat);
-                    auditPort.log(cmd.userId(), "BOOKING_CREATED", "BOOKING", savedBooking.id().toString(), null, savedBooking);
+                    eventPublisher.publishEvent(new SeatHeldEvent(seat, savedSeat));
+                    eventPublisher.publishEvent(new BookingCreatedEvent(cmd.userId(), savedBooking));
 
                     return savedBooking;
                 });

@@ -4,9 +4,10 @@ import com.linkz.seatreservation.business.domain.enums.*;
 import com.linkz.seatreservation.business.domain.model.*;
 import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
 import com.linkz.seatreservation.business.port.external.*;
+import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import java.util.Map;
 
 @Service
 public class PaymentNotificationService implements HandlePaymentNotificationUseCase {
@@ -16,7 +17,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
     private final PaymentNotificationRepositoryPort paymentNotificationRepo;
     private final PaymentGatewayPort paymentGateway;
     private final CachePort cachePort;
-    private final AuditPort auditPort;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
     public PaymentNotificationService(BookingRepositoryPort bookingRepo,
@@ -25,7 +26,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
                                       PaymentNotificationRepositoryPort paymentNotificationRepo,
                                       PaymentGatewayPort paymentGateway,
                                       CachePort cachePort,
-                                      AuditPort auditPort,
+                                      ApplicationEventPublisher eventPublisher,
                                       TransactionTemplate transactionTemplate) {
         this.bookingRepo = bookingRepo;
         this.seatRepo = seatRepo;
@@ -33,7 +34,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
         this.paymentNotificationRepo = paymentNotificationRepo;
         this.paymentGateway = paymentGateway;
         this.cachePort = cachePort;
-        this.auditPort = auditPort;
+        this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -44,8 +45,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
         if (existingStatus.isPresent()) {
             String status = existingStatus.get();
             if ("PROCESSED".equals(status) || "DUPLICATE".equals(status)) {
-                auditPort.log("system", "WEBHOOK_DUPLICATE", "WEBHOOK", cmd.eventId(), null, 
-                    auditDetails("Duplicate event ID checked", cmd.eventId(), cmd.rawPayload()));
+                eventPublisher.publishEvent(new PaymentNotificationDuplicateEvent(cmd.eventId(), cmd.rawPayload(), "Duplicate event ID checked"));
                 paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "DUPLICATE", "Duplicate event detected");
                 return;
             }
@@ -53,7 +53,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
 
         // Step 2: Persist raw payload to database IMMEDIATELY — before ANY logic.
         paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "RECEIVED", null);
-        auditPort.log("system", "WEBHOOK_RECEIVED", "WEBHOOK", cmd.eventId(), null, cmd.rawPayload());
+        eventPublisher.publishEvent(new PaymentNotificationReceivedEvent(cmd.eventId(), cmd.rawPayload()));
 
         try {
             // Step 3: Run processing inside transaction
@@ -80,15 +80,11 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
                             handleLateArrival(booking, payment, cmd);
                         } else {
                             paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
-                            auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, 
-                                auditDetails("Failed payment for already expired/cancelled booking", cmd.eventId(), cmd.rawPayload()));
+                            eventPublisher.publishEvent(new PaymentNotificationProcessedEvent(cmd.eventId(), cmd.rawPayload(), "Failed payment for already expired/cancelled booking"));
                         }
                     }
                     case CONFIRMED -> {
-                        Map<String, Object> dupDetails = auditDetails("booking", booking, cmd.eventId());
-                        dupDetails.put("message", "Duplicate webhook for confirmed booking");
-                        dupDetails.put("rawPayload", cmd.rawPayload());
-                        auditPort.log("system", "WEBHOOK_DUPLICATE", "BOOKING", booking.id().toString(), booking, dupDetails);
+                        eventPublisher.publishEvent(new BookingDuplicateNotificationEvent(booking, cmd.eventId(), cmd.rawPayload()));
                         paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", "Duplicate webhook for confirmed booking");
                     }
                 }
@@ -104,7 +100,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CONFIRMED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
         );
-        bookingRepo.save(confirmedBooking);
+        Booking savedBooking = bookingRepo.save(confirmedBooking);
 
         Seat reservedSeat = new Seat(seat.id(), seat.label(), SeatStatus.RESERVED, seat.version());
         Seat savedSeat = seatRepo.save(reservedSeat);
@@ -113,7 +109,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
             PaymentStatus.SUCCESS, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
         );
-        paymentRepo.save(successPayment);
+        Payment savedPayment = paymentRepo.save(successPayment);
 
         paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
@@ -128,10 +124,12 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
         );
         cachePort.put("seat:cache:" + seat.id(), cachedSeatWithHoldInfo, 24 * 3600);
 
-        auditPort.log("system", "BOOKING_CONFIRMED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", confirmedBooking, cmd.eventId()));
-        auditPort.log("system", "SEAT_RESERVED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));
-        auditPort.log("system", "PAYMENT_SUCCESS", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", successPayment, cmd.eventId()));
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Booking confirmed", cmd.eventId(), cmd.rawPayload()));
+        eventPublisher.publishEvent(new BookingConfirmedEvent(
+            booking, savedBooking,
+            seat, savedSeat,
+            payment, savedPayment,
+            cmd.eventId()
+        ));
     }
 
     private void failBooking(Booking booking, Seat seat, Payment payment, PaymentNotificationCommand cmd) {
@@ -139,7 +137,7 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CANCELLED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
         );
-        bookingRepo.save(cancelledBooking);
+        Booking savedBooking = bookingRepo.save(cancelledBooking);
 
         Seat availableSeat = new Seat(seat.id(), seat.label(), SeatStatus.AVAILABLE, seat.version());
         Seat savedSeat = seatRepo.save(availableSeat);
@@ -148,16 +146,18 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
             PaymentStatus.FAILED, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
         );
-        paymentRepo.save(failedPayment);
+        Payment savedPayment = paymentRepo.save(failedPayment);
 
         paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
 
-        auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, auditDetails("booking", cancelledBooking, cmd.eventId()));
-        auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, auditDetails("seat", savedSeat, cmd.eventId()));
-        auditPort.log("system", "PAYMENT_FAILED", "PAYMENT", payment.id().toString(), payment, auditDetails("payment", failedPayment, cmd.eventId()));
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Payment failed", cmd.eventId(), cmd.rawPayload()));
+        eventPublisher.publishEvent(new BookingCancelledEvent(
+            booking, savedBooking,
+            seat, savedSeat,
+            payment, savedPayment,
+            cmd.eventId()
+        ));
     }
 
     private void handleLateArrival(Booking booking, Payment payment, PaymentNotificationCommand cmd) {
@@ -165,17 +165,11 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
             PaymentStatus.REFUNDED, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
         );
-        paymentRepo.save(refundedPayment);
+        Payment savedPayment = paymentRepo.save(refundedPayment);
 
         paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), "", "PROCESSED", null);
 
-        auditPort.log("system", "REFUND_INITIATED", "PAYMENT", payment.id().toString(), payment, auditDetails("refund_initiated", refundedPayment, cmd.eventId()));
+        eventPublisher.publishEvent(new BookingLateRefundEvent(booking, payment, savedPayment, cmd.eventId()));
         paymentGateway.refund(payment.externalPaymentId());
-        auditPort.log("system", "REFUND_COMPLETED", "PAYMENT", payment.id().toString(), payment, auditDetails("refund_completed", refundedPayment, cmd.eventId()));
-        auditPort.log("system", "WEBHOOK_PROCESSED", "WEBHOOK", cmd.eventId(), null, auditDetails("Late arrival payment refunded", cmd.eventId(), cmd.rawPayload()));
-    }
-
-    private Map<String, Object> auditDetails(String name, Object value, String eventId) {
-        return new java.util.HashMap<>(Map.of(name, value, "triggerEventId", eventId));
     }
 }

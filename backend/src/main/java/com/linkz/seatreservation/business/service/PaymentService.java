@@ -7,6 +7,8 @@ import com.linkz.seatreservation.business.domain.model.Booking;
 import com.linkz.seatreservation.business.domain.model.Payment;
 import com.linkz.seatreservation.business.port.in.InitiatePaymentUseCase;
 import com.linkz.seatreservation.business.port.external.*;
+import org.springframework.context.ApplicationEventPublisher;
+import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
@@ -18,18 +20,18 @@ public class PaymentService implements InitiatePaymentUseCase {
     private final BookingRepositoryPort bookingRepo;
     private final PaymentRepositoryPort paymentRepo;
     private final PaymentGatewayPort paymentGateway;
-    private final AuditPort auditPort;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
     public PaymentService(BookingRepositoryPort bookingRepo,
                           PaymentRepositoryPort paymentRepo,
                           PaymentGatewayPort paymentGateway,
-                          AuditPort auditPort,
+                          ApplicationEventPublisher eventPublisher,
                           TransactionTemplate transactionTemplate) {
         this.bookingRepo = bookingRepo;
         this.paymentRepo = paymentRepo;
         this.paymentGateway = paymentGateway;
-        this.auditPort = auditPort;
+        this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -67,7 +69,7 @@ public class PaymentService implements InitiatePaymentUseCase {
                 LocalDateTime.now()
             );
             Payment saved = paymentRepo.save(payment);
-            auditPort.log(cmd.userId(), "PAYMENT_INITIATED", "PAYMENT", saved.id().toString(), null, saved);
+            eventPublisher.publishEvent(new PaymentInitiatedEvent(cmd.userId(), saved));
             return saved;
         });
 

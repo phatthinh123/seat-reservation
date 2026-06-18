@@ -5,8 +5,10 @@ import com.linkz.seatreservation.business.domain.model.*;
 import com.linkz.seatreservation.business.port.in.HandlePaymentNotificationUseCase;
 import com.linkz.seatreservation.business.port.external.*;
 import com.linkz.seatreservation.business.service.PaymentNotificationService;
+import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -18,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Pure unit tests for PaymentNotificationService — no Spring context, all collaborators mocked.
+ * Pure unit tests for PaymentNotificationService - no Spring context, no I/O, all collaborators mocked.
  */
 class PaymentNotificationServiceTest {
 
@@ -28,17 +30,17 @@ class PaymentNotificationServiceTest {
     PaymentNotificationRepositoryPort paymentNotificationRepo = mock(PaymentNotificationRepositoryPort.class);
     PaymentGatewayPort paymentGateway = mock(PaymentGatewayPort.class);
     CachePort cache = mock(CachePort.class);
-    AuditPort audit = mock(AuditPort.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
 
     PaymentNotificationService service = new PaymentNotificationService(
         bookingRepo, seatRepo, paymentRepo, paymentNotificationRepo,
-        paymentGateway, cache, audit, transactionTemplate
+        paymentGateway, cache, eventPublisher, transactionTemplate
     );
 
     @BeforeEach
     void setUp() {
-        reset(bookingRepo, seatRepo, paymentRepo, paymentNotificationRepo, paymentGateway, cache, audit, transactionTemplate);
+        reset(bookingRepo, seatRepo, paymentRepo, paymentNotificationRepo, paymentGateway, cache, eventPublisher, transactionTemplate);
         // Stub TransactionTemplate to execute callback inline (synchronous in tests)
         doAnswer(invocation -> {
             java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback = invocation.getArgument(0);
@@ -87,6 +89,7 @@ class PaymentNotificationServiceTest {
         verify(paymentRepo).save(argThat(p -> p.status() == PaymentStatus.SUCCESS));
         verify(paymentNotificationRepo).saveEvent(eq("mock-payment"), eq(eventId), any(), eq("PROCESSED"), any());
         verify(cache).put(eq("seat:cache:" + seatId), any(), anyLong());
+        verify(eventPublisher).publishEvent(any(BookingConfirmedEvent.class));
     }
 
     // ─── Non-Happy Path ───────────────────────────────────────────────────────
@@ -123,6 +126,7 @@ class PaymentNotificationServiceTest {
         verify(bookingRepo, never()).save(any());
         verify(seatRepo, never()).save(any());
         verify(paymentNotificationRepo).saveEvent(eq("mock-payment"), eq(eventId), any(), eq("PROCESSED"), any());
+        verify(eventPublisher).publishEvent(any(BookingLateRefundEvent.class));
     }
 
     @Test
@@ -159,7 +163,7 @@ class PaymentNotificationServiceTest {
             eq("mock-payment"), eq(eventId), any(), eq("PROCESSED"),
             eq("Duplicate webhook for confirmed booking")
         );
-        verify(audit).log(any(), eq("WEBHOOK_DUPLICATE"), eq("BOOKING"), any(), any(), any());
+        verify(eventPublisher).publishEvent(any(BookingDuplicateNotificationEvent.class));
     }
 
     @Test
@@ -174,6 +178,6 @@ class PaymentNotificationServiceTest {
 
         verify(bookingRepo, never()).findByExternalPaymentIdForUpdate(any());
         verify(paymentNotificationRepo).saveEvent(eq("mock-payment"), eq(eventId), any(), eq("DUPLICATE"), any());
-        verify(audit).log(any(), eq("WEBHOOK_DUPLICATE"), eq("WEBHOOK"), eq(eventId), any(), any());
+        verify(eventPublisher).publishEvent(any(PaymentNotificationDuplicateEvent.class));
     }
 }

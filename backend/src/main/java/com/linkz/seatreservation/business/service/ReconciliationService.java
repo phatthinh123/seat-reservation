@@ -6,6 +6,8 @@ import com.linkz.seatreservation.business.port.in.ReconcilePaymentUseCase;
 import com.linkz.seatreservation.business.port.external.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
@@ -22,7 +24,7 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
     private final PaymentRepositoryPort paymentRepo;
     private final PaymentGatewayPort paymentGateway;
     private final CachePort cachePort;
-    private final AuditPort auditPort;
+    private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
     public ReconciliationService(BookingRepositoryPort bookingRepo,
@@ -30,21 +32,21 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
                                  PaymentRepositoryPort paymentRepo,
                                  PaymentGatewayPort paymentGateway,
                                  CachePort cachePort,
-                                 AuditPort auditPort,
+                                 ApplicationEventPublisher eventPublisher,
                                  TransactionTemplate transactionTemplate) {
         this.bookingRepo = bookingRepo;
         this.seatRepo = seatRepo;
         this.paymentRepo = paymentRepo;
         this.paymentGateway = paymentGateway;
         this.cachePort = cachePort;
-        this.auditPort = auditPort;
+        this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
     }
 
     @Override
     public void reconcile(UUID bookingId) {
         log.info("Triggering manual reconciliation for booking {}", bookingId);
-        auditPort.log("admin", "MANUAL_RECONCILE", "BOOKING", bookingId.toString(), null, "Manual reconcile triggered");
+        eventPublisher.publishEvent(new ManualReconcileEvent(bookingId));
         
         transactionTemplate.executeWithoutResult(status -> {
             Booking booking = bookingRepo.findByIdForUpdate(bookingId)
@@ -79,7 +81,7 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
     @Override
     public void reconcilePendingBookings() {
         log.info("Running scheduled reconciliation job");
-        auditPort.log("system", "RECONCILIATION_RUN", "SYSTEM", "reconciliation", null, "Scheduled reconciliation run");
+        eventPublisher.publishEvent(new ReconciliationRunEvent());
 
         LocalDateTime limit = LocalDateTime.now().plusMinutes(2);
         List<Booking> pendingBookings = bookingRepo.findExpiredPending(limit);
@@ -161,24 +163,28 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.EXPIRED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
         );
-        bookingRepo.save(expiredBooking);
+        Booking savedBooking = bookingRepo.save(expiredBooking);
 
         Seat availableSeat = new Seat(seat.id(), seat.label(), SeatStatus.AVAILABLE, seat.version());
         Seat savedSeat = seatRepo.save(availableSeat);
 
-        paymentRepo.findByBookingId(booking.id()).ifPresent(payment -> {
+        Payment payment = paymentRepo.findByBookingId(booking.id()).orElse(null);
+        Payment savedPayment = null;
+        if (payment != null) {
             Payment failedPayment = new Payment(
                 payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
                 PaymentStatus.FAILED, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
             );
-            paymentRepo.save(failedPayment);
-            auditPort.log("system", "PAYMENT_FAILED", "PAYMENT", payment.id().toString(), payment, failedPayment);
-        });
+            savedPayment = paymentRepo.save(failedPayment);
+        }
 
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
 
-        auditPort.log("system", "BOOKING_EXPIRED", "BOOKING", booking.id().toString(), booking, expiredBooking);
-        auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, savedSeat);
+        eventPublisher.publishEvent(new BookingExpiredEvent(
+            booking, savedBooking,
+            seat, savedSeat,
+            payment, savedPayment
+        ));
     }
 
     private void confirmBooking(Booking booking, Seat seat, Payment payment) {
@@ -186,7 +192,7 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CONFIRMED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
         );
-        bookingRepo.save(confirmedBooking);
+        Booking savedBooking = bookingRepo.save(confirmedBooking);
 
         Seat reservedSeat = new Seat(seat.id(), seat.label(), SeatStatus.RESERVED, seat.version());
         Seat savedSeat = seatRepo.save(reservedSeat);
@@ -195,7 +201,7 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
             PaymentStatus.SUCCESS, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
         );
-        paymentRepo.save(successPayment);
+        Payment savedPayment = paymentRepo.save(successPayment);
 
         Seat cachedSeatWithHoldInfo = new Seat(
             savedSeat != null ? savedSeat.id() : seat.id(),
@@ -208,9 +214,12 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
         );
         cachePort.put("seat:cache:" + seat.id(), cachedSeatWithHoldInfo, 24 * 3600);
 
-        auditPort.log("system", "BOOKING_CONFIRMED", "BOOKING", booking.id().toString(), booking, confirmedBooking);
-        auditPort.log("system", "SEAT_RESERVED", "SEAT", seat.id().toString(), seat, savedSeat);
-        auditPort.log("system", "PAYMENT_SUCCESS", "PAYMENT", payment.id().toString(), payment, successPayment);
+        eventPublisher.publishEvent(new BookingConfirmedEvent(
+            booking, savedBooking,
+            seat, savedSeat,
+            payment, savedPayment,
+            null
+        ));
     }
 
     private void failBooking(Booking booking, Seat seat, Payment payment) {
@@ -218,7 +227,7 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
             booking.id(), booking.userId(), booking.seatId(), BookingStatus.CANCELLED,
             booking.idempotencyKey(), booking.holdExpiresAt(), booking.createdAt(), java.time.LocalDateTime.now()
         );
-        bookingRepo.save(cancelledBooking);
+        Booking savedBooking = bookingRepo.save(cancelledBooking);
 
         Seat availableSeat = new Seat(seat.id(), seat.label(), SeatStatus.AVAILABLE, seat.version());
         Seat savedSeat = seatRepo.save(availableSeat);
@@ -227,12 +236,15 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
             payment.id(), payment.bookingId(), payment.externalPaymentId(), payment.amount(),
             PaymentStatus.FAILED, payment.rawPayload(), payment.createdAt(), java.time.LocalDateTime.now()
         );
-        paymentRepo.save(failedPayment);
+        Payment savedPayment = paymentRepo.save(failedPayment);
 
         cachePort.put("seat:cache:" + seat.id(), savedSeat, 24 * 3600);
 
-        auditPort.log("system", "BOOKING_CANCELLED", "BOOKING", booking.id().toString(), booking, cancelledBooking);
-        auditPort.log("system", "SEAT_RELEASED", "SEAT", seat.id().toString(), seat, savedSeat);
-        auditPort.log("system", "PAYMENT_FAILED", "PAYMENT", payment.id().toString(), payment, failedPayment);
+        eventPublisher.publishEvent(new BookingCancelledEvent(
+            booking, savedBooking,
+            seat, savedSeat,
+            payment, savedPayment,
+            null
+        ));
     }
 }

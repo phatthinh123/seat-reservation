@@ -8,8 +8,10 @@ import com.linkz.seatreservation.business.domain.model.Seat;
 import com.linkz.seatreservation.business.port.in.HoldSeatUseCase;
 import com.linkz.seatreservation.business.port.external.*;
 import com.linkz.seatreservation.business.service.BookingService;
+import com.linkz.seatreservation.business.domain.event.AuditEvents.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -37,14 +39,14 @@ class BookingServiceTest {
     BookingRepositoryPort bookingRepo = mock(BookingRepositoryPort.class);
     DistributedLockPort lock = mock(DistributedLockPort.class);
     CachePort cache = mock(CachePort.class);
-    AuditPort audit = mock(AuditPort.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
 
-    BookingService service = new BookingService(seatRepo, bookingRepo, lock, cache, audit, transactionTemplate);
+    BookingService service = new BookingService(seatRepo, bookingRepo, lock, cache, eventPublisher, transactionTemplate);
 
     @BeforeEach
     void setUp() {
-        reset(seatRepo, bookingRepo, lock, cache, audit, transactionTemplate);
+        reset(seatRepo, bookingRepo, lock, cache, eventPublisher, transactionTemplate);
         // Stub TransactionTemplate to execute the callback inline (no real DB transaction)
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
@@ -93,6 +95,8 @@ class BookingServiceTest {
         verify(bookingRepo).save(any(Booking.class));
         verify(seatRepo).save(argThat(s -> s.status() == SeatStatus.HELD));
         verify(lock).unlock(seatId.toString());
+        verify(eventPublisher).publishEvent(any(SeatHeldEvent.class));
+        verify(eventPublisher).publishEvent(any(BookingCreatedEvent.class));
     }
 
     /**
