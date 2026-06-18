@@ -13,10 +13,10 @@ export interface PaymentResponse {
 export class PaymentService {
   constructor(private http: HttpClient) {}
 
-  initiatePayment(bookingId: string, simulateFail: boolean): Observable<PaymentResponse> {
+  initiatePayment(bookingId: string, simulateFail: boolean, simulateDelay: boolean = false): Observable<PaymentResponse> {
     return this.http.post<PaymentResponse>(
       `${environment.apiUrl}/api/bookings/${bookingId}/payment`,
-      { simulateFail }
+      { simulateFail, simulateDelay }
     );
   }
 }

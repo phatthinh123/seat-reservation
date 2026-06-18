@@ -1,7 +1,0 @@
-package com.tpthinh.seatreservation.business.domain.enums;
-
-public enum SeatStatus {
-    AVAILABLE,
-    HELD,
-    RESERVED
-}

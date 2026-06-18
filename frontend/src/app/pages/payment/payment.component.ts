@@ -50,6 +50,13 @@ import { PaymentService } from '../../core/services/payment.service';
               <span class="simulation-label">⚠️ Simulate payment failure</span>
             </label>
             <p class="simulation-desc">If enabled, the payment gateway will simulate a failed charge webhook.</p>
+            
+            <label class="checkbox-container" style="margin-top: 12px;">
+              <input type="checkbox" [(ngModel)]="simulateDelay">
+              <span class="checkbox-checkmark"></span>
+              <span class="simulation-label">⏱️ Simulate payment delay</span>
+            </label>
+            <p class="simulation-desc">If enabled, the payment webhook will be delayed by 60 seconds.</p>
           </div>
 
           <div *ngIf="errorMessage" class="toast-error" style="margin-top: 16px;">
@@ -188,6 +195,7 @@ export class PaymentComponent implements OnInit, OnDestroy {
   remainingSeconds: number = 0;
   isExpired: boolean = false;
   simulateFail: boolean = false;
+  simulateDelay: boolean = false;
   isProcessing: boolean = false;
   errorMessage: string | null = null;
   private timerInterval: any;
@@ -295,7 +303,7 @@ export class PaymentComponent implements OnInit, OnDestroy {
     // POST /pay on the Mock Payment Service with the flag set.
     // Do NOT call localhost:9090/simulate/fail directly from the browser:
     // that URL is only reachable inside the Docker network.
-    this.paymentService.initiatePayment(this.booking!.bookingId, this.simulateFail).subscribe({
+    this.paymentService.initiatePayment(this.booking!.bookingId, this.simulateFail, this.simulateDelay).subscribe({
       next: (_res) => {
         this.router.navigate(['/confirmation'], {
           queryParams: {
