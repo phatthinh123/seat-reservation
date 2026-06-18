@@ -57,6 +57,13 @@ import { PaymentService } from '../../core/services/payment.service';
               <span class="simulation-label">⏱️ Simulate payment delay</span>
             </label>
             <p class="simulation-desc">If enabled, the payment webhook will be delayed by 60 seconds.</p>
+
+            <label class="checkbox-container" style="margin-top: 12px;">
+              <input type="checkbox" [(ngModel)]="simulateUiDelay">
+              <span class="checkbox-checkmark"></span>
+              <span class="simulation-label">⏳ Simulate UI loading delay</span>
+            </label>
+            <p class="simulation-desc">If enabled, the UI will show a loading spinner for 3 seconds before continuing.</p>
           </div>
 
           <div *ngIf="errorMessage" class="toast-error" style="margin-top: 16px;">
@@ -196,6 +203,7 @@ export class PaymentComponent implements OnInit, OnDestroy {
   isExpired: boolean = false;
   simulateFail: boolean = false;
   simulateDelay: boolean = false;
+  simulateUiDelay: boolean = false;
   isProcessing: boolean = false;
   errorMessage: string | null = null;
   private timerInterval: any;
@@ -298,26 +306,29 @@ export class PaymentComponent implements OnInit, OnDestroy {
     this.isProcessing = true;
     this.errorMessage = null;
 
-    // Pass simulateFail to the backend — the backend forwards it to the payment gateway
-    // via PaymentGatewayPort.initiatePayment(..., simulateFail), which calls
-    // POST /pay on the Mock Payment Service with the flag set.
-    // Do NOT call localhost:9090/simulate/fail directly from the browser:
-    // that URL is only reachable inside the Docker network.
-    this.paymentService.initiatePayment(this.booking!.bookingId, this.simulateFail, this.simulateDelay).subscribe({
-      next: (_res) => {
-        this.router.navigate(['/confirmation'], {
-          queryParams: {
-            status: 'pending',
-            bookingId: this.booking!.bookingId
-          }
-        });
-      },
-      error: (err) => {
-        console.error('Payment initiation error', err);
-        this.isProcessing = false;
-        this.errorMessage = err.error?.message || 'Payment initiation failed. Please try again.';
-      }
-    });
+    const executePayment = () => {
+      this.paymentService.initiatePayment(this.booking!.bookingId, this.simulateFail, this.simulateDelay).subscribe({
+        next: (_res) => {
+          this.router.navigate(['/confirmation'], {
+            queryParams: {
+              status: 'pending',
+              bookingId: this.booking!.bookingId
+            }
+          });
+        },
+        error: (err) => {
+          console.error('Payment initiation error', err);
+          this.isProcessing = false;
+          this.errorMessage = err.error?.message || 'Payment initiation failed. Please try again.';
+        }
+      });
+    };
+
+    if (this.simulateUiDelay) {
+      setTimeout(() => executePayment(), 3000);
+    } else {
+      executePayment();
+    }
   }
 
   goBack(): void {

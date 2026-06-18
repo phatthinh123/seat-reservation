@@ -17,7 +17,12 @@ export class BookingService {
   constructor(private http: HttpClient) {}
 
   holdSeat(seatId: string): Observable<BookingResponse> {
-    return this.http.post<BookingResponse>(`${environment.apiUrl}/api/bookings`, { seatId });
+    const idempotencyKey = crypto.randomUUID();
+    return this.http.post<BookingResponse>(
+      `${environment.apiUrl}/api/bookings`,
+      { seatId },
+      { headers: { 'Idempotency-Key': idempotencyKey } }
+    );
   }
 
   getBooking(bookingId: string): Observable<BookingResponse> {

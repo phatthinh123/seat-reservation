@@ -7,6 +7,7 @@ export interface SeatResponse {
   id: string;
   label: string;
   status: 'AVAILABLE' | 'HELD' | 'RESERVED';
+  heldBy?: string;
 }
 
 @Injectable({ providedIn: 'root' })

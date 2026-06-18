@@ -35,10 +35,10 @@ import { BookingService } from '../../core/services/booking.service';
               Hold Seat
             </button>
             <span *ngIf="seat.status === 'HELD'" class="held-status-text">
-              Currently Held
+              Held by {{ seat.heldBy || 'Unknown' }}
             </span>
             <span *ngIf="seat.status === 'RESERVED'" class="reserved-status-text">
-              Reserved
+              Reserved by {{ seat.heldBy || 'Unknown' }}
             </span>
           </div>
         </div>
