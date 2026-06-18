@@ -6,9 +6,7 @@ import com.linkz.seatreservation.web.dto.PaymentResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
@@ -22,12 +20,18 @@ public class PaymentController {
     @PostMapping("/api/bookings/{id}/payment")
     public ResponseEntity<PaymentResponse> initiatePayment(
             @PathVariable("id") UUID bookingId,
+            @RequestBody(required = false) InitiatePaymentRequest body,
             @AuthenticationPrincipal Jwt jwt) {
-        
+
         String userId = jwt.getSubject();
-        InitiatePaymentUseCase.InitiatePaymentCommand cmd = new InitiatePaymentUseCase.InitiatePaymentCommand(bookingId, userId);
+        boolean simulateFail = body != null && body.simulateFail();
+        InitiatePaymentUseCase.InitiatePaymentCommand cmd =
+            new InitiatePaymentUseCase.InitiatePaymentCommand(bookingId, userId, simulateFail);
         Payment payment = initiatePaymentUseCase.initiatePayment(cmd);
-        
+
         return ResponseEntity.ok(PaymentResponse.from(payment));
     }
+
+    /** Thin request DTO — keeps controller free of business logic. */
+    record InitiatePaymentRequest(boolean simulateFail) {}
 }

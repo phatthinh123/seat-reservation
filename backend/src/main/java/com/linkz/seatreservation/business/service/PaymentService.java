@@ -71,8 +71,9 @@ public class PaymentService implements InitiatePaymentUseCase {
             return saved;
         });
 
-        // Delegate to gateway
-        String externalPaymentId = paymentGateway.initiatePayment(booking.id(), amount, null, false);
+        // Delegate to gateway — forward the simulateFail flag so the mock service
+        // can decide whether to deliver a SUCCESS or FAILURE webhook.
+        String externalPaymentId = paymentGateway.initiatePayment(booking.id(), amount, null, cmd.simulateFail());
 
         Payment updatedPayment = transactionTemplate.execute(status -> {
             Payment payment = paymentRepo.findById(pendingPayment.id())

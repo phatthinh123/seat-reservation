@@ -6,5 +6,5 @@ import java.util.UUID;
 public interface InitiatePaymentUseCase {
     Payment initiatePayment(InitiatePaymentCommand command);
 
-    record InitiatePaymentCommand(UUID bookingId, String userId) {}
+    record InitiatePaymentCommand(UUID bookingId, String userId, boolean simulateFail) {}
 }

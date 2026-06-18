@@ -5,6 +5,7 @@ import com.linkz.seatreservation.adapter.persistence.repo.WebhookEventJpaReposit
 import com.linkz.seatreservation.business.port.external.WebhookEventRepositoryPort;
 import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Component
 public class WebhookEventJpaAdapter implements WebhookEventRepositoryPort {
@@ -20,15 +21,33 @@ public class WebhookEventJpaAdapter implements WebhookEventRepositoryPort {
     }
 
     @Override
+    public Optional<String> findStatusByEventId(String eventId) {
+        return repository.findByEventId(eventId).map(WebhookEventEntity::getStatus);
+    }
+
+    @Override
     public void saveEvent(String provider, String eventId, String rawPayload, String status, String error) {
-        WebhookEventEntity entity = WebhookEventEntity.builder()
-            .provider(provider)
-            .eventId(eventId)
-            .rawPayload(rawPayload)
-            .status(status)
-            .processedAt(LocalDateTime.now())
-            .error(error)
-            .build();
-        repository.save(entity);
+        // Find if it already exists, so we update it instead of inserting a duplicate row
+        // if eventId is unique.
+        Optional<WebhookEventEntity> existing = repository.findByEventId(eventId);
+        if (existing.isPresent()) {
+            WebhookEventEntity entity = existing.get();
+            entity.setProvider(provider);
+            entity.setRawPayload(rawPayload);
+            entity.setStatus(status);
+            entity.setProcessedAt(LocalDateTime.now());
+            entity.setError(error);
+            repository.save(entity);
+        } else {
+            WebhookEventEntity entity = WebhookEventEntity.builder()
+                .provider(provider)
+                .eventId(eventId)
+                .rawPayload(rawPayload)
+                .status(status)
+                .processedAt(LocalDateTime.now())
+                .error(error)
+                .build();
+            repository.save(entity);
+        }
     }
 }

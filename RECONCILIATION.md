@@ -199,12 +199,9 @@ The scheduled job runs every 5 minutes. To observe it without waiting:
 
 ## Configuration
 
-Scheduled intervals are set in `backend/src/main/resources/application.yml`:
+Scheduled intervals are defined directly via `@Scheduled` annotations in the scheduler classes:
 
-```yaml
-scheduling:
-  hold-cleanup-cron: "0 */1 * * * *"     # every 1 minute
-  reconciliation-cron: "0 */5 * * * *"   # every 5 minutes
-```
+- **Hold Cleanup Job** ([SeatHoldCleanupJob.java](file:///home/tpthinh/playground/seat-reservation/seat-reservation/backend/src/main/java/com/linkz/seatreservation/web/scheduler/SeatHoldCleanupJob.java)): `@Scheduled(fixedDelay = 60000)` (every 1 minute)
+- **Reconciliation Job** ([ReconciliationJob.java](file:///home/tpthinh/playground/seat-reservation/seat-reservation/backend/src/main/java/com/linkz/seatreservation/web/scheduler/ReconciliationJob.java)): `@Scheduled(fixedDelay = 300000)` (every 5 minutes)
 
-To test faster, temporarily change the cron to `"*/30 * * * * *"` (every 30 seconds) during development.
+To test faster locally, you can temporarily change the `fixedDelay` values (e.g., to `30000` for 30 seconds) in the Java files.

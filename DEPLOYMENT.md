@@ -125,15 +125,12 @@ docker compose down -v
 
 ## Running Tests
 
-> **Requires Docker to be running** — the test suite uses Testcontainers to spin up ephemeral PostgreSQL and Redis instances.
+> **Requires Docker to be running** — the test suite uses Testcontainers to automatically spin up ephemeral PostgreSQL and Redis instances. You do not need to manually start PostgreSQL/Redis containers via docker compose.
 
 ```bash
-# From the project root
-docker compose up postgres redis -d   # ensure Docker daemon is responsive
-wsl -d Ubuntu -e bash -c "
-  cd /home/tpthinh/playground/seat-reservation/seat-reservation/backend
-  ../gradlew test
-"
+# Inside WSL or on the host shell
+cd backend
+../gradlew test
 ```
 
 Or inside WSL directly:

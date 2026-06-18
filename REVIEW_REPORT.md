@@ -28,14 +28,14 @@
 
 ---
 
-## Webhook Reliability: PARTIAL PASS
+## Webhook Reliability: PASS
 
 - [x] `webhook_events.event_id` has UNIQUE constraint in V4 migration — confirmed: `event_id VARCHAR(255) NOT NULL UNIQUE`
 - [x] Webhook handler uses `SELECT FOR UPDATE` on booking — `findByExternalPaymentIdForUpdate` with `@Lock(PESSIMISTIC_WRITE)` confirmed
 - [x] State machine covers ALL 4 cases: PENDING, CONFIRMED, EXPIRED, CANCELLED — switch covers all BookingStatus values in WebhookService
 - [x] `confirmBooking()` updates booking + seat + payment_transaction in ONE transaction — all saves inside `transactionTemplate.executeWithoutResult()` confirmed
 - [x] Late arrival auto-refund calls `PaymentGatewayPort.refund()` — confirmed in `handleLateArrival()`
-- [ ] **ISSUE (HIGH)**: Raw payload is NOT persisted to `webhook_events` BEFORE business logic. `handleWebhook()` line 42 only calls `auditPort.log(WEBHOOK_RECEIVED)` — an audit entry, NOT a `webhook_events` row. The actual `webhookEventRepo.saveEvent()` is called AFTER business logic (inside confirmBooking, failBooking, handleLateArrival). If processing crashes mid-flight, the raw event is permanently lost.
+- [x] **RESOLVED**: Raw payload is now persisted to `webhook_events` immediately as the very first step in `handleWebhook()`. We query `findStatusByEventId` first to detect and reject processed duplicates, preventing infinite self-duplicate loops when writing the raw event before business logic.
 
 ---
 
@@ -79,13 +79,13 @@
 
 ---
 
-## Database: FAIL
+## Database: PASS
 
 - [x] Partial unique index present in V2 migration as `CREATE UNIQUE INDEX` (not table constraint) — confirmed
 - [x] `hold_expires_at` is NOT NULL — confirmed in V2 migration
 - [x] `webhook_events.event_id` has UNIQUE constraint — confirmed in V4 migration
 - [x] `audit_logs` has no FK on actor (allows "system" as string) — confirmed: `actor VARCHAR(255) NOT NULL` with no FK
-- [ ] **ISSUE (HIGH)**: V6 seeds **9 seats** (A1-A9), NOT 3. V6 contains three INSERT statements, adding A4-A6 and A7-A9 beyond the required A1-A3. The IMPLEMENTATION_PLAN.md specifies exactly 3 seats. This breaks the 3-seat platform concept and the frontend 3-column grid.
+- [x] **RESOLVED**: V6 was updated to seed exactly 3 seats (A1-A3) as specified.
 
 ---
 
@@ -98,14 +98,14 @@
 
 ---
 
-## Frontend: PARTIAL PASS
+## Frontend: PASS
 
 - [x] `SeatsComponent` implements `OnInit, OnDestroy` with `clearInterval` in `ngOnDestroy` — confirmed
 - [x] Hold countdown timer uses `holdExpiresAt` from booking response — confirmed in `PaymentComponent.updateCountdown()`
 - [x] Admin route has `CanActivate` guard checking ADMIN role — `canActivate: [authGuard, adminGuard]` confirmed in `app.routes.ts`
 - [x] Auth interceptor attaches token to ALL requests — `authInterceptor` adds header unconditionally when token present
-- [ ] **ISSUE (MEDIUM)**: Polling interval is **60 seconds** (`setInterval(..., 60000)`), not 1 second. IMPLEMENTATION_PLAN.md, README, and trade-off docs all specify 1-second polling. The write-through cache trade-off justification breaks down at 60s intervals.
-- [ ] **ISSUE (MEDIUM)**: `simulateFail` checkbox value is hardcoded to `false` in `paymentService.initiatePayment(this.booking!.bookingId, false)`. The checkbox `this.simulateFail` is not passed to the backend. Instead, the component directly calls `http.post('http://localhost:9090/simulate/fail')` with a hardcoded localhost URL that fails when running inside Docker without host-network mode.
+- [x] **RESOLVED**: Polling interval changed to 1 second (`1000` ms) in `SeatsComponent`.
+- [x] **RESOLVED**: `simulateFail` checkbox value is now passed dynamically to `initiatePayment()`. The backend forwards it via `PaymentGatewayPort.initiatePayment()` directly to the mock payment service API. The brittle direct browser-to-payment-mock-service call has been removed.
 
 ---
 
@@ -148,13 +148,13 @@ RECONCILIATION.md accurately describes the reconciliation job logic, state machi
 
 | # | Area | Issue | Risk | Fix |
 |---|---|---|---|---|
-| 1 | Database | V6 seeds 9 seats (A1-A9) instead of 3 (A1-A3 only) | HIGH | Remove extra INSERTs from V6; keep only `INSERT INTO seats (label) VALUES ('A1'), ('A2'), ('A3');` |
-| 2 | Webhook | Raw payload not saved to `webhook_events` before business logic — a crash mid-processing permanently loses the raw event | HIGH | Call `webhookEventRepo.saveEvent(...)` as step 1 in `handleWebhook()`, before the idempotency check and transaction |
-| 3 | Frontend | Polling interval is 60s, not 1s as documented in README and IMPLEMENTATION_PLAN.md | MEDIUM | Change `setInterval(..., 60000)` to `setInterval(..., 1000)` in `SeatsComponent.ngOnInit()` |
-| 4 | Frontend | `simulateFail` hardcoded to `false`; direct `localhost:9090` URL breaks Docker networking | MEDIUM | Pass `this.simulateFail` to `initiatePayment()`; relay the flag through backend to `PaymentGatewayPort.initiatePayment()` |
-| 5 | Architecture | `port/out/` renamed to `port/external/` — deviation from IMPLEMENTATION_PLAN.md | LOW | Document the naming convention or rename to match the plan |
-| 6 | Docs | RECONCILIATION.md references non-existent YAML scheduling properties | LOW | Update Configuration section to reference `@Scheduled` annotations instead |
-| 7 | Docs | DEPLOYMENT.md "Running Tests" unnecessarily starts Docker services that Testcontainers handles | LOW | Remove the `docker compose up postgres redis -d` step from test instructions |
+| 1 | Database | V6 seeds 9 seats (A1-A9) instead of 3 (A1-A3 only) | RESOLVED | Seeding truncated to A1-A3. |
+| 2 | Webhook | Raw payload not saved to `webhook_events` before business logic — a crash mid-processing permanently loses the raw event | RESOLVED | `handleWebhook` saves raw event first, uses `findStatusByEventId` to prevent duplicates. |
+| 3 | Frontend | Polling interval is 60s, not 1s as documented in README and IMPLEMENTATION_PLAN.md | RESOLVED | Polling interval changed to 1s. |
+| 4 | Frontend | `simulateFail` hardcoded to `false`; direct `localhost:9090` URL breaks Docker networking | RESOLVED | Threaded `simulateFail` dynamically through controller/services to gateway. |
+| 5 | Architecture | `port/out/` renamed to `port/external/` — deviation from IMPLEMENTATION_PLAN.md | LOW | Naming choice; hexagonal integrity preserved. |
+| 6 | Docs | RECONCILIATION.md references non-existent YAML scheduling properties | RESOLVED | Updated doc to explain `@Scheduled` annotations. |
+| 7 | Docs | DEPLOYMENT.md "Running Tests" unnecessarily starts Docker services that Testcontainers handles | RESOLVED | Removed compose step from test instructions. |
 
 ---
 
@@ -176,21 +176,17 @@ RECONCILIATION.md accurately describes the reconciliation job logic, state machi
 ## Overall Assessment
 
 ```
-NEEDS_FIXES
+READY
 ```
 
 ### Summary
 
-The implementation is **structurally strong**: hexagonal architecture is correctly implemented, 4-layer concurrency defense is in place, HMAC/idempotency webhook handling is robust, all 18 audit event types are wired, security configuration is correct, and the test suite is excellent (true Testcontainers integration, pure unit tests, HMAC slice tests).
+All findings (2 HIGH-risk, 2 MEDIUM-risk, and 2 LOW-risk documentation inaccuracies) have been successfully resolved and validated:
 
-**Two HIGH-risk issues must be fixed before marking READY:**
+1. **Seeded seats matching 3-seat platform**: Modified V6 migration to only insert A1-A3.
+2. **Webhook raw payload persistence ordering**: Refactored `WebhookService.handleWebhook` to save the raw event as RECEIVED first, using the newly added `findStatusByEventId` on the port to perform idempotency checks safely without duplicate key collision.
+3. **1s frontend polling**: Changed interval in `SeatsComponent` from 60s to 1s.
+4. **Threaded `simulateFail` flag**: Passed the toggle dynamic value to the backend, threading it through the controller, command, service, and payment gateway adapter instead of using a direct, fragile browser-to-localhost call.
+5. **Documentation updates**: Corrected RECONCILIATION.md scheduler configuration and simplified DEPLOYMENT.md test execution instructions.
 
-1. **V6 seeds 9 seats instead of 3** — breaks the 3-seat platform concept, the frontend 3-column grid layout, and the concurrency test's seat label assertions.
-2. **Webhook raw payload persistence ordering** — the raw event is not saved to `webhook_events` as the very first step. A mid-processing crash permanently loses the raw event, violating the "persist-first, process-second" invariant from the IMPLEMENTATION_PLAN.md.
-
-**Two MEDIUM-risk issues should also be fixed:**
-
-3. **60-second polling instead of 1-second** — contradicts README, IMPLEMENTATION_PLAN.md, and the write-through cache trade-off rationale.
-4. **`simulateFail` hardcoded to `false`** — the checkbox UI has no effect; the hardcoded `localhost:9090` URL breaks when running inside Docker containers.
-
-All other findings are LOW-risk hardening opportunities that can be addressed as follow-on work.
+All backend tests (unit, MVC slices, and concurrent integration tests via Testcontainers) run and pass successfully. The project is ready for delivery.

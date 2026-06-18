@@ -290,37 +290,26 @@ export class PaymentComponent implements OnInit, OnDestroy {
     this.isProcessing = true;
     this.errorMessage = null;
 
-    const triggerPayment = () => {
-      this.paymentService.initiatePayment(this.booking!.bookingId, false).subscribe({
-        next: (res) => {
-          this.router.navigate(['/confirmation'], {
-            queryParams: {
-              status: 'pending',
-              bookingId: this.booking!.bookingId
-            }
-          });
-        },
-        error: (err) => {
-          console.error('Payment initiation error', err);
-          this.isProcessing = false;
-          this.errorMessage = err.error?.message || 'Payment initiation failed. Please try again.';
-        }
-      });
-    };
-
-    if (this.simulateFail) {
-      this.http.post('http://localhost:9090/simulate/fail', {}).subscribe({
-        next: () => {
-          triggerPayment();
-        },
-        error: (err) => {
-          console.error('Failed to trigger simulation on mock-payment-service. Proceeding anyway.', err);
-          triggerPayment();
-        }
-      });
-    } else {
-      triggerPayment();
-    }
+    // Pass simulateFail to the backend — the backend forwards it to the payment gateway
+    // via PaymentGatewayPort.initiatePayment(..., simulateFail), which calls
+    // POST /pay on the Mock Payment Service with the flag set.
+    // Do NOT call localhost:9090/simulate/fail directly from the browser:
+    // that URL is only reachable inside the Docker network.
+    this.paymentService.initiatePayment(this.booking!.bookingId, this.simulateFail).subscribe({
+      next: (_res) => {
+        this.router.navigate(['/confirmation'], {
+          queryParams: {
+            status: 'pending',
+            bookingId: this.booking!.bookingId
+          }
+        });
+      },
+      error: (err) => {
+        console.error('Payment initiation error', err);
+        this.isProcessing = false;
+        this.errorMessage = err.error?.message || 'Payment initiation failed. Please try again.';
+      }
+    });
   }
 
   goBack(): void {

@@ -85,7 +85,7 @@ class WebhookServiceTest {
             PaymentStatus.PENDING, "{}", LocalDateTime.now(), LocalDateTime.now()
         );
 
-        when(webhookEventRepo.existsByEventId(eventId)).thenReturn(false);
+        when(webhookEventRepo.findStatusByEventId(eventId)).thenReturn(Optional.empty());
         when(bookingRepo.findByExternalPaymentIdForUpdate(paymentId)).thenReturn(Optional.of(pendingBooking));
         when(seatRepo.findByIdForUpdate(seatId)).thenReturn(Optional.of(heldSeat));
         when(paymentRepo.findByExternalPaymentId(paymentId)).thenReturn(Optional.of(pendingPayment));
@@ -132,7 +132,7 @@ class WebhookServiceTest {
             PaymentStatus.PENDING, "{}", LocalDateTime.now(), LocalDateTime.now()
         );
 
-        when(webhookEventRepo.existsByEventId(eventId)).thenReturn(false);
+        when(webhookEventRepo.findStatusByEventId(eventId)).thenReturn(Optional.empty());
         when(bookingRepo.findByExternalPaymentIdForUpdate(paymentId)).thenReturn(Optional.of(expiredBooking));
         when(seatRepo.findByIdForUpdate(seatId)).thenReturn(Optional.of(availableSeat));
         when(paymentRepo.findByExternalPaymentId(paymentId)).thenReturn(Optional.of(pendingPayment));
@@ -175,7 +175,7 @@ class WebhookServiceTest {
             PaymentStatus.SUCCESS, "{}", LocalDateTime.now(), LocalDateTime.now()
         );
 
-        when(webhookEventRepo.existsByEventId(eventId)).thenReturn(false);
+        when(webhookEventRepo.findStatusByEventId(eventId)).thenReturn(Optional.empty());
         when(bookingRepo.findByExternalPaymentIdForUpdate(paymentId)).thenReturn(Optional.of(confirmedBooking));
         when(seatRepo.findByIdForUpdate(seatId)).thenReturn(Optional.of(reservedSeat));
         when(paymentRepo.findByExternalPaymentId(paymentId)).thenReturn(Optional.of(successPayment));
@@ -207,7 +207,7 @@ class WebhookServiceTest {
         // Given — this event ID already exists in webhook_events (processed previously)
         String eventId = "evt-already-processed";
 
-        when(webhookEventRepo.existsByEventId(eventId)).thenReturn(true);
+        when(webhookEventRepo.findStatusByEventId(eventId)).thenReturn(Optional.of("PROCESSED"));
 
         // When — the duplicate event arrives
         service.handleWebhook(new HandleWebhookUseCase.WebhookEventCommand(

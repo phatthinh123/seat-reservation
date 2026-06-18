@@ -38,15 +38,22 @@ public class WebhookService implements HandleWebhookUseCase {
 
     @Override
     public void handleWebhook(WebhookEventCommand cmd) {
-        // Step 1: Persist raw event to webhook_events IMMEDIATELY (no transaction, save event details first)
-        auditPort.log("system", "WEBHOOK_RECEIVED", "WEBHOOK", cmd.eventId(), null, cmd.rawPayload());
-
-        // Step 2: Idempotency check via event_id UNIQUE
-        if (webhookEventRepo.existsByEventId(cmd.eventId())) {
-            auditPort.log("system", "WEBHOOK_DUPLICATE", "WEBHOOK", cmd.eventId(), null, "Duplicate event ID checked");
-            webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "DUPLICATE", "Duplicate event detected");
-            return;
+        // Step 1: Check if the event was already processed or marked duplicate
+        java.util.Optional<String> existingStatus = webhookEventRepo.findStatusByEventId(cmd.eventId());
+        if (existingStatus.isPresent()) {
+            String status = existingStatus.get();
+            if ("PROCESSED".equals(status) || "DUPLICATE".equals(status)) {
+                auditPort.log("system", "WEBHOOK_DUPLICATE", "WEBHOOK", cmd.eventId(), null, "Duplicate event ID checked");
+                webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "DUPLICATE", "Duplicate event detected");
+                return;
+            }
         }
+
+        // Step 2: Persist raw payload to webhook_events IMMEDIATELY — before ANY logic.
+        // This is the "persist-first" invariant: if the process crashes at any point after
+        // this line, the raw event is still on disk and can be replayed during reconciliation.
+        webhookEventRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "RECEIVED", null);
+        auditPort.log("system", "WEBHOOK_RECEIVED", "WEBHOOK", cmd.eventId(), null, cmd.rawPayload());
 
         try {
             // Step 3: Run processing inside transaction

@@ -159,10 +159,10 @@ export class SeatsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadSeats();
-    // Poll every 60 seconds - backend handles cleanup and cache is write-through
+    // Poll every 1 second so users see live seat status changes immediately
     this.pollInterval = setInterval(() => {
       this.loadSeats();
-    }, 60000);
+    }, 1000);
   }
 
   ngOnDestroy(): void {
