@@ -48,12 +48,9 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
         }
         eventPublisher.publishEvent(new PaymentNotificationReceivedEvent(cmd.eventId(), cmd.rawPayload()));
 
-        var triggerRefund = new boolean[]{false};
-        var refundExternalId = new String[]{null};
-
         try {
-            // Step 3: Run processing inside transaction
-            transactionTemplate.executeWithoutResult(status -> {
+            // Step 3: Run processing inside transaction and return the external payment ID if a refund is required
+            String refundExternalId = transactionTemplate.execute(status -> {
                 var booking = bookingRepo.findByExternalPaymentIdForUpdate(cmd.paymentId())
                     .orElseThrow(() -> new RuntimeException("Booking not found for payment ID: " + cmd.paymentId()));
 
@@ -63,19 +60,25 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
                 var payment = paymentRepo.findByExternalPaymentId(cmd.paymentId())
                     .orElseThrow(() -> new RuntimeException("Payment transaction not found for external payment ID: " + cmd.paymentId()));
 
-                switch (booking.status()) {
-                    case PENDING            -> handlePendingNotification(booking, seat, payment, cmd);
-                    case EXPIRED, CANCELLED -> handleLateNotification(booking, payment, cmd, triggerRefund, refundExternalId);
-                    case CONFIRMED          -> handleConfirmedNotification(booking, cmd);
-                }
+                return switch (booking.status()) {
+                    case PENDING -> {
+                        handlePendingNotification(booking, seat, payment, cmd);
+                        yield null;
+                    }
+                    case EXPIRED, CANCELLED -> handleLateNotification(booking, payment, cmd);
+                    case CONFIRMED -> {
+                        handleConfirmedNotification(booking, cmd);
+                        yield null;
+                    }
+                };
             });
 
             // Step 4: Execute external payment gateway API call OUTSIDE of db transaction
-            if (triggerRefund[0] && refundExternalId[0] != null) {
+            if (refundExternalId != null) {
                 try {
-                    paymentGateway.refund(refundExternalId[0]);
+                    paymentGateway.refund(refundExternalId);
                 } catch (Exception e) {
-                    log.error("Failed to execute external refund call for external payment ID: " + refundExternalId[0], e);
+                    log.error("Failed to execute external refund call for external payment ID: " + refundExternalId, e);
                 }
             }
         } catch (Exception e) {
@@ -92,14 +95,14 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
         }
     }
 
-    private void handleLateNotification(Booking booking, Payment payment, PaymentNotificationCommand cmd, boolean[] triggerRefund, String[] refundExternalId) {
+    private String handleLateNotification(Booking booking, Payment payment, PaymentNotificationCommand cmd) {
         if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
             handleLateArrival(booking, payment, cmd);
-            triggerRefund[0] = true;
-            refundExternalId[0] = payment.externalPaymentId();
+            return payment.externalPaymentId();
         } else {
             paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
             eventPublisher.publishEvent(new PaymentNotificationProcessedEvent(cmd.eventId(), cmd.rawPayload(), "Failed payment for already expired/cancelled booking"));
+            return null;
         }
     }
 

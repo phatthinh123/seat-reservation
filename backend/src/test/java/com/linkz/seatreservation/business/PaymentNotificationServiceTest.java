@@ -48,6 +48,11 @@ class PaymentNotificationServiceTest {
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
 
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            org.springframework.transaction.support.TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+
         // Stub repositories to return the saved entities (preventing nulls)
         when(seatRepo.save(any(Seat.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingRepo.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
