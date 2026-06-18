@@ -11,7 +11,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,6 +24,15 @@ import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Slice test for WebhookController — verifies HMAC signature enforcement at the HTTP layer.
+ * No business logic is exercised here; HandleWebhookUseCase is mocked.
+ *
+ * All tests follow BDD structure:
+ *   // Given — set up preconditions
+ *   // When  — perform the HTTP request
+ *   // Then  — assert the expected HTTP response code
+ */
 @WebMvcTest(WebhookController.class)
 @ActiveProfiles("test")
 @Import(com.linkz.seatreservation.web.config.SecurityConfig.class)
@@ -44,19 +52,23 @@ class WebhookControllerTest {
 
     private final String testSecret = "test-secret";
 
+    // ─── Happy Path ───────────────────────────────────────────────────────────
+
+    /**
+     * Happy path:
+     * When a webhook arrives with a valid HMAC-SHA256 signature that matches
+     * the shared secret, the request is accepted with HTTP 200.
+     */
     @Test
-    void webhook_withValidSignature_shouldReturn200() throws Exception {
-        WebhookEventDto dto = new WebhookEventDto(
-            "evt-123",
-            "pay-123",
-            UUID.randomUUID().toString(),
-            "SUCCESS"
-        );
+    void testWebhook_validHmacSignature_shouldReturn200() throws Exception {
+        // Given — a well-formed webhook payload with a correct HMAC signature
+        WebhookEventDto dto = new WebhookEventDto("evt-ok", "pay-ok", UUID.randomUUID().toString(), "SUCCESS");
         String body = objectMapper.writeValueAsString(dto);
         String signature = hmacSha256(body, testSecret);
 
         doNothing().when(handleWebhookUseCase).handleWebhook(any());
 
+        // When / Then — request with valid signature → 200 OK
         mockMvc.perform(post("/api/webhooks/payment")
                 .header("X-Signature", signature)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -64,39 +76,48 @@ class WebhookControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test
-    void webhook_withInvalidSignature_shouldReturn400() throws Exception {
-        WebhookEventDto dto = new WebhookEventDto(
-            "evt-123",
-            "pay-123",
-            UUID.randomUUID().toString(),
-            "SUCCESS"
-        );
-        String body = objectMapper.writeValueAsString(dto);
-        String signature = "invalid-signature";
+    // ─── Non-Happy Path ───────────────────────────────────────────────────────
 
+    /**
+     * Non-happy path (tampered signature):
+     * When the X-Signature header does not match the HMAC of the body
+     * (e.g., the payload was tampered with, or a wrong secret was used),
+     * the request must be rejected with HTTP 400 to prevent spoofed webhooks.
+     */
+    @Test
+    void testWebhook_invalidHmacSignature_shouldReturn400() throws Exception {
+        // Given — a real payload but a deliberately wrong signature
+        WebhookEventDto dto = new WebhookEventDto("evt-bad", "pay-bad", UUID.randomUUID().toString(), "SUCCESS");
+        String body = objectMapper.writeValueAsString(dto);
+        String tamperedSignature = "deadbeefdeadbeef";
+
+        // When / Then — request with invalid signature → 400 Bad Request
         mockMvc.perform(post("/api/webhooks/payment")
-                .header("X-Signature", signature)
+                .header("X-Signature", tamperedSignature)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Non-happy path (missing signature):
+     * When no X-Signature header is present at all (e.g., a direct probe
+     * from an unknown caller), the request must be rejected with HTTP 400.
+     */
     @Test
-    void webhook_withMissingSignature_shouldReturn400() throws Exception {
-        WebhookEventDto dto = new WebhookEventDto(
-            "evt-123",
-            "pay-123",
-            UUID.randomUUID().toString(),
-            "SUCCESS"
-        );
+    void testWebhook_missingSignatureHeader_shouldReturn400() throws Exception {
+        // Given — a real payload but no X-Signature header
+        WebhookEventDto dto = new WebhookEventDto("evt-nosig", "pay-nosig", UUID.randomUUID().toString(), "SUCCESS");
         String body = objectMapper.writeValueAsString(dto);
 
+        // When / Then — request without X-Signature → 400 Bad Request
         mockMvc.perform(post("/api/webhooks/payment")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isBadRequest());
     }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private String hmacSha256(String data, String secret) {
         try {

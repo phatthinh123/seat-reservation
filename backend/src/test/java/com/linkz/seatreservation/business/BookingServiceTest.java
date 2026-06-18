@@ -22,7 +22,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Pure unit tests for BookingService — no Spring context, no I/O, all collaborators mocked.
+ *
+ * Naming convention: test<MethodUnderTest>_<context>_<expectedOutcome>
+ * All tests follow BDD structure:
+ *   // Given — set up preconditions
+ *   // When  — invoke the method under test
+ *   // Then  — assert the expected outcome
+ */
 class BookingServiceTest {
+
     SeatRepositoryPort seatRepo = mock(SeatRepositoryPort.class);
     BookingRepositoryPort bookingRepo = mock(BookingRepositoryPort.class);
     DistributedLockPort lock = mock(DistributedLockPort.class);
@@ -35,106 +45,138 @@ class BookingServiceTest {
     @BeforeEach
     void setUp() {
         reset(seatRepo, bookingRepo, lock, cache, audit, transactionTemplate);
-        
-        // Stub transactionTemplate to execute callback immediately
+        // Stub TransactionTemplate to execute the callback inline (no real DB transaction)
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
     }
 
+    // ─── Happy Path ───────────────────────────────────────────────────────────
+
+    /**
+     * Happy path:
+     * When an available seat is held by a user with a new idempotency key,
+     * a PENDING booking is persisted and the seat becomes HELD in the repository.
+     */
     @Test
-    void holdSeat_whenAvailable_shouldCreatePendingBooking() {
+    void testHoldSeat_seatAvailable_shouldCreatePendingBookingAndMarkSeatHeld() {
+        // Given — seat is AVAILABLE, no prior idempotency entry, lock succeeds
         UUID seatId = UUID.randomUUID();
         String userId = "user-123";
         String idempotencyKey = "key-123";
-        Seat seat = new Seat(seatId, "A1", SeatStatus.AVAILABLE, 0L);
-        Booking booking = new Booking(UUID.randomUUID(), userId, seatId, BookingStatus.PENDING, idempotencyKey, LocalDateTime.now().plusMinutes(10), LocalDateTime.now(), LocalDateTime.now());
+        Seat availableSeat = new Seat(seatId, "A1", SeatStatus.AVAILABLE, 0L);
+        Booking expectedBooking = new Booking(
+            UUID.randomUUID(), userId, seatId, BookingStatus.PENDING,
+            idempotencyKey, LocalDateTime.now().plusMinutes(10),
+            LocalDateTime.now(), LocalDateTime.now()
+        );
 
-        // Mocks for CachePort
         when(cache.get(eq("idempotency:key:" + idempotencyKey), eq(Booking.class))).thenReturn(null);
         when(cache.setIfAbsent(eq("idempotency:lock:" + idempotencyKey), any(), anyLong())).thenReturn(true);
         when(cache.get(eq("seat:cache:" + seatId), eq(Seat.class))).thenReturn(null);
-
-        // Mocks for Lock
         when(lock.tryLock(eq(seatId.toString()), anyLong(), anyLong())).thenReturn(true);
-
-        // Mocks for Repo
-        when(seatRepo.findByIdForUpdate(seatId)).thenReturn(Optional.of(seat));
-        when(seatRepo.findById(seatId)).thenReturn(Optional.of(seat));
+        when(seatRepo.findByIdForUpdate(seatId)).thenReturn(Optional.of(availableSeat));
+        when(seatRepo.findById(seatId)).thenReturn(Optional.of(availableSeat));
         when(bookingRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
-        when(seatRepo.save(any(Seat.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(bookingRepo.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(seatRepo.save(any(Seat.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepo.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        HoldSeatUseCase.BookingResult result = service.holdSeat(new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey));
+        // When — the hold is requested
+        HoldSeatUseCase.BookingResult result = service.holdSeat(
+            new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey)
+        );
 
+        // Then — booking is PENDING, seat label is returned, lock is released
         assertThat(result.booking().status()).isEqualTo(BookingStatus.PENDING);
         assertThat(result.seatLabel()).isEqualTo("A1");
-        
         verify(bookingRepo).save(any(Booking.class));
         verify(seatRepo).save(argThat(s -> s.status() == SeatStatus.HELD));
         verify(lock).unlock(seatId.toString());
     }
 
+    /**
+     * Happy path (idempotency):
+     * When the same idempotency key arrives a second time and the booking
+     * is already cached, the existing booking is returned immediately
+     * without touching the lock, the database, or saving anything new.
+     */
     @Test
-    void holdSeat_whenHeld_shouldThrowSeatUnavailableException() {
+    void testHoldSeat_duplicateIdempotencyKey_shouldReturnExistingBookingWithoutReserving() {
+        // Given — the idempotency cache already holds a completed booking
         UUID seatId = UUID.randomUUID();
         String userId = "user-123";
         String idempotencyKey = "key-123";
-        Seat seat = new Seat(seatId, "A1", SeatStatus.HELD, 0L);
-
-        // Mocks for CachePort
-        when(cache.get(eq("idempotency:key:" + idempotencyKey), eq(Booking.class))).thenReturn(null);
-        when(cache.setIfAbsent(eq("idempotency:lock:" + idempotencyKey), any(), anyLong())).thenReturn(true);
-        
-        // Mocks for CachePort seat:cache check (fail fast)
-        when(cache.get(eq("seat:cache:" + seatId), eq(Seat.class))).thenReturn(seat);
-
-        HoldSeatUseCase.HoldSeatCommand cmd = new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey);
-        
-        assertThatThrownBy(() -> service.holdSeat(cmd))
-            .isInstanceOf(SeatUnavailableException.class);
-            
-        verify(bookingRepo, never()).save(any());
-    }
-
-    @Test
-    void holdSeat_withSameIdempotencyKey_shouldReturnExistingBooking() {
-        UUID seatId = UUID.randomUUID();
-        String userId = "user-123";
-        String idempotencyKey = "key-123";
-        Booking existingBooking = new Booking(UUID.randomUUID(), userId, seatId, BookingStatus.PENDING, idempotencyKey, LocalDateTime.now().plusMinutes(10), LocalDateTime.now(), LocalDateTime.now());
-
-        // CachePort returns existing booking
+        Booking existingBooking = new Booking(
+            UUID.randomUUID(), userId, seatId, BookingStatus.PENDING,
+            idempotencyKey, LocalDateTime.now().plusMinutes(10),
+            LocalDateTime.now(), LocalDateTime.now()
+        );
         when(cache.get(eq("idempotency:key:" + idempotencyKey), eq(Booking.class))).thenReturn(existingBooking);
         when(seatRepo.findById(seatId)).thenReturn(Optional.of(new Seat(seatId, "A1", SeatStatus.HELD, 0L)));
 
-        HoldSeatUseCase.BookingResult result = service.holdSeat(new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey));
+        // When — the same request is replayed
+        HoldSeatUseCase.BookingResult result = service.holdSeat(
+            new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey)
+        );
 
+        // Then — the cached booking is returned; nothing new is saved or locked
         assertThat(result.booking()).isEqualTo(existingBooking);
         assertThat(result.seatLabel()).isEqualTo("A1");
-        
         verify(bookingRepo, never()).save(any());
         verify(lock, never()).tryLock(any(), anyLong(), anyLong());
     }
 
+    // ─── Non-Happy Path ───────────────────────────────────────────────────────
+
+    /**
+     * Non-happy path (seat already held):
+     * When the Redis cache shows the seat is HELD by someone else,
+     * the service must fail fast with SeatUnavailableException
+     * before ever acquiring a lock or hitting the database.
+     */
     @Test
-    void holdSeat_whenLockFails_shouldThrowSeatUnavailableException() {
+    void testHoldSeat_seatAlreadyHeld_shouldThrowSeatUnavailableException() {
+        // Given — the seat cache reveals the seat is already HELD
+        UUID seatId = UUID.randomUUID();
+        String userId = "user-123";
+        String idempotencyKey = "key-123";
+        Seat heldSeat = new Seat(seatId, "A1", SeatStatus.HELD, 0L);
+
+        when(cache.get(eq("idempotency:key:" + idempotencyKey), eq(Booking.class))).thenReturn(null);
+        when(cache.setIfAbsent(eq("idempotency:lock:" + idempotencyKey), any(), anyLong())).thenReturn(true);
+        when(cache.get(eq("seat:cache:" + seatId), eq(Seat.class))).thenReturn(heldSeat);
+
+        // When / Then — SeatUnavailableException is thrown without any DB writes
+        assertThatThrownBy(() ->
+            service.holdSeat(new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey))
+        ).isInstanceOf(SeatUnavailableException.class);
+
+        verify(bookingRepo, never()).save(any());
+    }
+
+    /**
+     * Non-happy path (lock contention):
+     * When the distributed lock cannot be acquired within the timeout
+     * (another thread holds the lock), the service must throw
+     * SeatUnavailableException immediately — not block indefinitely.
+     */
+    @Test
+    void testHoldSeat_distributedLockTimeout_shouldThrowSeatUnavailableException() {
+        // Given — cache shows seat is AVAILABLE but the distributed lock fails
         UUID seatId = UUID.randomUUID();
         String userId = "user-123";
         String idempotencyKey = "key-123";
 
-        // Mocks for CachePort
         when(cache.get(eq("idempotency:key:" + idempotencyKey), eq(Booking.class))).thenReturn(null);
         when(cache.setIfAbsent(eq("idempotency:lock:" + idempotencyKey), any(), anyLong())).thenReturn(true);
         when(cache.get(eq("seat:cache:" + seatId), eq(Seat.class))).thenReturn(null);
-
-        // Mocks for Lock returning false
         when(lock.tryLock(eq(seatId.toString()), anyLong(), anyLong())).thenReturn(false);
 
-        HoldSeatUseCase.HoldSeatCommand cmd = new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey);
-
-        assertThatThrownBy(() -> service.holdSeat(cmd))
+        // When / Then — SeatUnavailableException is thrown with a meaningful message
+        assertThatThrownBy(() ->
+            service.holdSeat(new HoldSeatUseCase.HoldSeatCommand(seatId, userId, idempotencyKey))
+        )
             .isInstanceOf(SeatUnavailableException.class)
             .hasMessageContaining("Seat temporarily locked");
 

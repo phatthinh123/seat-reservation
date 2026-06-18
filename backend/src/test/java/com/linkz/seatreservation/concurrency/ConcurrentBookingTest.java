@@ -45,6 +45,11 @@ import static org.mockito.Mockito.when;
 /**
  * Integration tests requiring Docker (Testcontainers with PostgreSQL and Redis).
  * Skipped automatically when Docker is unavailable.
+ *
+ * All tests follow BDD structure:
+ *   // Given — set up preconditions
+ *   // When  — execute the action under test
+ *   // Then  — assert expected outcomes
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
@@ -106,6 +111,230 @@ public class ConcurrentBookingTest {
     @MockBean
     private PaymentGatewayPort paymentGateway;
 
+    // ─── Happy Path ───────────────────────────────────────────────────────────
+
+    /**
+     * Happy path (concurrency):
+     * When 100 users simultaneously try to hold the same seat,
+     * exactly 1 request succeeds and the rest receive a 409 CONFLICT.
+     * This proves the pessimistic-lock + Redis-lock chain works correctly.
+     */
+    @Test
+    void testConcurrency_only1Request_shouldSucceed() throws Exception {
+        // Given — seat A1 exists and is available
+        ResponseEntity<SeatResponse[]> seatsResp = restTemplate.exchange(
+            "/api/seats",
+            HttpMethod.GET,
+            new HttpEntity<>(createHeaders("test-user")),
+            SeatResponse[].class
+        );
+        assertThat(seatsResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        SeatResponse seatA1 = Arrays.stream(seatsResp.getBody())
+            .filter(s -> "A1".equals(s.label()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Seat A1 not found"));
+        UUID seatId = seatA1.id();
+
+        int threads = 100;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch ready = new CountDownLatch(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicInteger successes = new AtomicInteger();
+        AtomicInteger conflicts = new AtomicInteger();
+
+        // When — 100 threads all try to hold the same seat simultaneously
+        for (int i = 0; i < threads; i++) {
+            final String userId = "user-" + i;
+            String raw = userId + ":" + seatId;
+            String idempotencyKey = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8))
+            );
+            pool.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    ResponseEntity<BookingResponse> resp = restTemplate.postForEntity(
+                        "/api/bookings",
+                        new HttpEntity<>(new HoldSeatRequest(seatId), createHeaders(userId, idempotencyKey)),
+                        BookingResponse.class
+                    );
+                    if (resp.getStatusCode() == HttpStatus.CREATED)   successes.incrementAndGet();
+                    else if (resp.getStatusCode() == HttpStatus.CONFLICT) conflicts.incrementAndGet();
+                } catch (Exception ignored) {}
+            });
+        }
+        ready.await();
+        start.countDown();
+        pool.shutdown();
+        pool.awaitTermination(15, TimeUnit.SECONDS);
+
+        // Then — exactly 1 succeeds, 99 are rejected, seat is HELD in DB
+        assertThat(successes.get()).isEqualTo(1);
+        assertThat(conflicts.get()).isEqualTo(99);
+        String dbStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM seats WHERE id = ?", String.class, seatId
+        );
+        assertThat(dbStatus).isEqualTo("HELD");
+    }
+
+    /**
+     * Happy path (idempotency):
+     * When the same Idempotency-Key is sent twice for the same seat,
+     * both responses return HTTP 201 with the identical booking ID
+     * — demonstrating safe at-most-once booking creation.
+     */
+    @Test
+    void testIdempotency_sameKeySubmittedTwice_shouldReturnSameBooking() throws Exception {
+        // Given — seat A2 is available, client has a stable idempotency key
+        ResponseEntity<SeatResponse[]> seatsResp = restTemplate.exchange(
+            "/api/seats",
+            HttpMethod.GET,
+            new HttpEntity<>(createHeaders("test-user")),
+            SeatResponse[].class
+        );
+        SeatResponse seatA2 = Arrays.stream(seatsResp.getBody())
+            .filter(s -> "A2".equals(s.label()))
+            .findFirst()
+            .orElseThrow();
+        UUID seatId = seatA2.id();
+        String idempotencyKey = UUID.randomUUID().toString();
+        String userId = "idemp-user";
+
+        // When — the same request is submitted twice with the same idempotency key
+        ResponseEntity<BookingResponse> first = restTemplate.postForEntity(
+            "/api/bookings",
+            new HttpEntity<>(new HoldSeatRequest(seatId), createHeaders(userId, idempotencyKey)),
+            BookingResponse.class
+        );
+        ResponseEntity<BookingResponse> second = restTemplate.postForEntity(
+            "/api/bookings",
+            new HttpEntity<>(new HoldSeatRequest(seatId), createHeaders(userId, idempotencyKey)),
+            BookingResponse.class
+        );
+
+        // Then — both return 201 and carry the exact same booking ID
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(first.getBody().bookingId()).isEqualTo(second.getBody().bookingId());
+    }
+
+    /**
+     * Happy path (webhook idempotency):
+     * When the payment gateway delivers the same webhook event twice,
+     * the booking is confirmed exactly once and the audit log contains
+     * only a single BOOKING_CONFIRMED entry.
+     */
+    @Test
+    void testWebhookIdempotency_duplicateWebhookDelivered_shouldProcessOnlyOnce() throws Exception {
+        // Given — a pending booking exists with an associated payment
+        jdbcTemplate.update("UPDATE seats SET status = 'AVAILABLE'");
+        jdbcTemplate.update("DELETE FROM bookings");
+
+        SeatResponse seat = Arrays.stream(
+            restTemplate.exchange("/api/seats", HttpMethod.GET,
+                new HttpEntity<>(createHeaders("test-user")), SeatResponse[].class).getBody()
+        ).filter(s -> "A2".equals(s.label())).findFirst().orElseThrow();
+
+        UUID seatId = seat.id();
+        String userId = "webhook-user";
+
+        ResponseEntity<BookingResponse> holdResp = restTemplate.postForEntity(
+            "/api/bookings",
+            new HttpEntity<>(new HoldSeatRequest(seatId), createHeaders(userId)),
+            BookingResponse.class
+        );
+        UUID bookingId = holdResp.getBody().bookingId();
+
+        when(paymentGateway.initiatePayment(any(), any(), any(), anyBoolean())).thenReturn("external-pay-123");
+        ResponseEntity<PaymentResponse> payResp = restTemplate.postForEntity(
+            "/api/bookings/" + bookingId + "/payment",
+            new HttpEntity<>(createHeaders(userId)),
+            PaymentResponse.class
+        );
+        String paymentId = payResp.getBody().paymentId();
+
+        String webhookBody = objectMapper.writeValueAsString(
+            new WebhookEventDto("evt-dup-123", paymentId, bookingId.toString(), "SUCCESS")
+        );
+        String signature = hmacSha256(webhookBody, "test-secret");
+        HttpHeaders webhookHeaders = new HttpHeaders();
+        webhookHeaders.setContentType(MediaType.APPLICATION_JSON);
+        webhookHeaders.set("X-Signature", signature);
+
+        // When — the same webhook is delivered twice
+        ResponseEntity<Void> first  = restTemplate.postForEntity("/api/webhooks/payment", new HttpEntity<>(webhookBody, webhookHeaders), Void.class);
+        ResponseEntity<Void> second = restTemplate.postForEntity("/api/webhooks/payment", new HttpEntity<>(webhookBody, webhookHeaders), Void.class);
+
+        // Then — both deliveries return 200 (ack), but BOOKING_CONFIRMED is written only once
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        int webhookRows = jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM webhook_events WHERE event_id = 'evt-dup-123'",
+            Integer.class
+        );
+        assertThat(webhookRows).isEqualTo(2); // first=PROCESSED, second=DUPLICATE
+
+        int confirmedAuditCount = jdbcTemplate.queryForObject(
+            "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action = 'BOOKING_CONFIRMED'",
+            Integer.class, bookingId.toString()
+        );
+        assertThat(confirmedAuditCount).isEqualTo(1);
+    }
+
+    // ─── Non-Happy Path ───────────────────────────────────────────────────────
+
+    /**
+     * Non-happy path (hold expiry):
+     * When a seat hold expires without payment, the cleanup job
+     * must release the seat back to AVAILABLE and mark the booking EXPIRED.
+     * This validates the scheduled hold-release mechanism.
+     */
+    @Test
+    void testHoldExpiry_holdTimesOutWithoutPayment_shouldReleaseSeatToAvailable() throws Exception {
+        // Given — a seat is held, then the hold_expires_at is artificially set in the past
+        jdbcTemplate.update("UPDATE seats SET status = 'AVAILABLE'");
+        jdbcTemplate.update("DELETE FROM bookings");
+
+        SeatResponse seat = Arrays.stream(
+            restTemplate.exchange("/api/seats", HttpMethod.GET,
+                new HttpEntity<>(createHeaders("test-user")), SeatResponse[].class).getBody()
+        ).filter(s -> "A3".equals(s.label())).findFirst().orElseThrow();
+
+        UUID seatId = seat.id();
+        ResponseEntity<BookingResponse> holdResp = restTemplate.postForEntity(
+            "/api/bookings",
+            new HttpEntity<>(new HoldSeatRequest(seatId), createHeaders("expired-user")),
+            BookingResponse.class
+        );
+        UUID bookingId = holdResp.getBody().bookingId();
+
+        String heldStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM seats WHERE id = ?", String.class, seatId
+        );
+        assertThat(heldStatus).isEqualTo("HELD");
+
+        // When — the hold is expired in the DB and the cleanup job runs
+        jdbcTemplate.update(
+            "UPDATE bookings SET hold_expires_at = ? WHERE id = ?",
+            LocalDateTime.now().minusMinutes(1), bookingId
+        );
+        reconciliationService.releaseExpiredHolds();
+
+        // Then — seat is AVAILABLE again and booking is EXPIRED
+        String seatStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM seats WHERE id = ?", String.class, seatId
+        );
+        assertThat(seatStatus).isEqualTo("AVAILABLE");
+
+        String bookingStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM bookings WHERE id = ?", String.class, bookingId
+        );
+        assertThat(bookingStatus).isEqualTo("EXPIRED");
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
     private HttpHeaders createHeaders(String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -117,261 +346,6 @@ public class ConcurrentBookingTest {
         HttpHeaders headers = createHeaders(token);
         headers.set("Idempotency-Key", idempotencyKey);
         return headers;
-    }
-
-    @Test
-    void only_one_of_100_concurrent_requests_should_succeed() throws Exception {
-        // Fetch seats to find an available seat ID (we use A1)
-        ResponseEntity<SeatResponse[]> seatsResp = restTemplate.exchange(
-            "/api/seats",
-            HttpMethod.GET,
-            new HttpEntity<>(createHeaders("test-user")),
-            SeatResponse[].class
-        );
-        assertThat(seatsResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        SeatResponse[] seats = seatsResp.getBody();
-        assertThat(seats).isNotNull();
-        
-        SeatResponse seatA1 = Arrays.stream(seats)
-            .filter(s -> "A1".equals(s.label()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("Seat A1 not found"));
-        
-        UUID seatId = seatA1.id();
-
-        int n = 100;
-        ExecutorService pool = Executors.newFixedThreadPool(n);
-        CountDownLatch ready = new CountDownLatch(n);
-        CountDownLatch start = new CountDownLatch(1);
-        AtomicInteger successes = new AtomicInteger();
-        AtomicInteger conflicts = new AtomicInteger();
-
-        for (int i = 0; i < n; i++) {
-            final String userId = "user-" + i;
-            // Generate standard idempotency key deterministic to make sure it doesn't fail due to same idempotency key across different users (each has their own)
-            String raw = userId + ":" + seatId;
-            String idempotencyKey = HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8))
-            );
-
-            pool.submit(() -> {
-                ready.countDown();
-                try {
-                    start.await();
-                    HttpHeaders headers = createHeaders(userId, idempotencyKey);
-                    HoldSeatRequest request = new HoldSeatRequest(seatId);
-                    ResponseEntity<BookingResponse> resp = restTemplate.postForEntity(
-                        "/api/bookings",
-                        new HttpEntity<>(request, headers),
-                        BookingResponse.class
-                    );
-                    if (resp.getStatusCode() == HttpStatus.CREATED) {
-                        successes.incrementAndGet();
-                    } else if (resp.getStatusCode() == HttpStatus.CONFLICT) {
-                        conflicts.incrementAndGet();
-                    }
-                } catch (Exception e) {
-                    // Ignore
-                }
-            });
-        }
-
-        ready.await();
-        start.countDown();
-        pool.shutdown();
-        pool.awaitTermination(15, TimeUnit.SECONDS);
-
-        assertThat(successes.get()).isEqualTo(1);
-        assertThat(conflicts.get()).isEqualTo(99);
-
-        // Verify seat status is HELD in DB
-        String status = jdbcTemplate.queryForObject(
-            "SELECT status FROM seats WHERE id = ?",
-            String.class,
-            seatId
-        );
-        assertThat(status).isEqualTo("HELD");
-    }
-
-    @Test
-    void same_idempotency_key_returns_same_booking() throws Exception {
-        // Fetch A2
-        ResponseEntity<SeatResponse[]> seatsResp = restTemplate.exchange(
-            "/api/seats",
-            HttpMethod.GET,
-            new HttpEntity<>(createHeaders("test-user")),
-            SeatResponse[].class
-        );
-        SeatResponse seatA2 = Arrays.stream(seatsResp.getBody())
-            .filter(s -> "A2".equals(s.label()))
-            .findFirst()
-            .orElseThrow();
-
-        UUID seatId = seatA2.id();
-        String idempotencyKey = UUID.randomUUID().toString();
-        String userId = "idemp-user";
-
-        HoldSeatRequest request = new HoldSeatRequest(seatId);
-        HttpHeaders headers = createHeaders(userId, idempotencyKey);
-
-        ResponseEntity<BookingResponse> first = restTemplate.postForEntity(
-            "/api/bookings",
-            new HttpEntity<>(request, headers),
-            BookingResponse.class
-        );
-        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-
-        ResponseEntity<BookingResponse> second = restTemplate.postForEntity(
-            "/api/bookings",
-            new HttpEntity<>(request, headers),
-            BookingResponse.class
-        );
-        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-
-        assertThat(first.getBody().bookingId()).isEqualTo(second.getBody().bookingId());
-    }
-
-    @Test
-    void webhook_processed_exactly_once_when_delivered_twice() throws Exception {
-        // Clear status and delete bookings to ensure clean slate
-        jdbcTemplate.update("UPDATE seats SET status = 'AVAILABLE'");
-        jdbcTemplate.update("DELETE FROM bookings");
-
-        ResponseEntity<SeatResponse[]> seatsResp = restTemplate.exchange(
-            "/api/seats",
-            HttpMethod.GET,
-            new HttpEntity<>(createHeaders("test-user")),
-            SeatResponse[].class
-        );
-        SeatResponse seat = Arrays.stream(seatsResp.getBody())
-            .filter(s -> "A2".equals(s.label()))
-            .findFirst()
-            .orElseThrow();
-
-        UUID seatId = seat.id();
-        String userId = "webhook-user";
-
-        // 1. Hold seat
-        HoldSeatRequest holdReq = new HoldSeatRequest(seatId);
-        ResponseEntity<BookingResponse> holdResp = restTemplate.postForEntity(
-            "/api/bookings",
-            new HttpEntity<>(holdReq, createHeaders(userId)),
-            BookingResponse.class
-        );
-        UUID bookingId = holdResp.getBody().bookingId();
-
-        // 2. Initiate Payment
-        when(paymentGateway.initiatePayment(any(), any(), any(), anyBoolean())).thenReturn("external-pay-123");
-        ResponseEntity<PaymentResponse> payResp = restTemplate.postForEntity(
-            "/api/bookings/" + bookingId + "/payment",
-            new HttpEntity<>(createHeaders(userId)),
-            PaymentResponse.class
-        );
-        String paymentId = payResp.getBody().paymentId();
-
-        // 3. Deliver Webhook Twice
-        WebhookEventDto webhookDto = new WebhookEventDto("evt-dup-123", paymentId, bookingId.toString(), "SUCCESS");
-        String webhookBody = objectMapper.writeValueAsString(webhookDto);
-        String signature = hmacSha256(webhookBody, "test-secret");
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Signature", signature);
-
-        // First delivery
-        ResponseEntity<Void> firstWeb = restTemplate.postForEntity(
-            "/api/webhooks/payment",
-            new HttpEntity<>(webhookBody, headers),
-            Void.class
-        );
-        assertThat(firstWeb.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-        // Second delivery
-        ResponseEntity<Void> secondWeb = restTemplate.postForEntity(
-            "/api/webhooks/payment",
-            new HttpEntity<>(webhookBody, headers),
-            Void.class
-        );
-        assertThat(secondWeb.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-        // Verify database state
-        int processedCount = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM webhook_events WHERE event_id = 'evt-dup-123'",
-            Integer.class
-        );
-        // Both are saved: first as PROCESSED, second as DUPLICATE (handled)
-        assertThat(processedCount).isEqualTo(2);
-
-        int processedAuditCount = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action = 'BOOKING_CONFIRMED'",
-            Integer.class,
-            bookingId.toString()
-        );
-        assertThat(processedAuditCount).isEqualTo(1);
-    }
-
-    @Test
-    void expired_hold_releases_seat_back_to_available() throws Exception {
-        // Clear everything first
-        jdbcTemplate.update("UPDATE seats SET status = 'AVAILABLE'");
-        jdbcTemplate.update("DELETE FROM bookings");
-
-        ResponseEntity<SeatResponse[]> seatsResp = restTemplate.exchange(
-            "/api/seats",
-            HttpMethod.GET,
-            new HttpEntity<>(createHeaders("test-user")),
-            SeatResponse[].class
-        );
-        SeatResponse seat = Arrays.stream(seatsResp.getBody())
-            .filter(s -> "A3".equals(s.label()))
-            .findFirst()
-            .orElseThrow();
-
-        UUID seatId = seat.id();
-        String userId = "expired-user";
-
-        // Hold seat
-        HoldSeatRequest holdReq = new HoldSeatRequest(seatId);
-        ResponseEntity<BookingResponse> holdResp = restTemplate.postForEntity(
-            "/api/bookings",
-            new HttpEntity<>(holdReq, createHeaders(userId)),
-            BookingResponse.class
-        );
-        UUID bookingId = holdResp.getBody().bookingId();
-
-        // Check held status
-        String heldStatus = jdbcTemplate.queryForObject(
-            "SELECT status FROM seats WHERE id = ?",
-            String.class,
-            seatId
-        );
-        assertThat(heldStatus).isEqualTo("HELD");
-
-        // Manually expire hold in DB
-        jdbcTemplate.update(
-            "UPDATE bookings SET hold_expires_at = ? WHERE id = ?",
-            LocalDateTime.now().minusMinutes(1),
-            bookingId
-        );
-
-        // Run cleanup job
-        reconciliationService.releaseExpiredHolds();
-
-        // Verify seat is available again
-        String finalStatus = jdbcTemplate.queryForObject(
-            "SELECT status FROM seats WHERE id = ?",
-            String.class,
-            seatId
-        );
-        assertThat(finalStatus).isEqualTo("AVAILABLE");
-
-        // Verify booking status is EXPIRED
-        String bookingStatus = jdbcTemplate.queryForObject(
-            "SELECT status FROM bookings WHERE id = ?",
-            String.class,
-            bookingId
-        );
-        assertThat(bookingStatus).isEqualTo("EXPIRED");
     }
 
     private String hmacSha256(String data, String secret) {
