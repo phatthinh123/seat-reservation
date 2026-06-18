@@ -1,0 +1,42 @@
+package com.tpthinh.seatreservation.adapter.persistence.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "payment_notifications")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class PaymentNotificationEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
+    
+    private String provider;
+    
+    @Column(name = "event_id", unique = true)
+    private String eventId;
+    
+    @Column(name = "raw_payload")
+    private String rawPayload;
+    
+    private String status;
+    
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+    
+    private String error;
+    
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+}
