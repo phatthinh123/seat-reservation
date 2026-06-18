@@ -64,27 +64,9 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
                     .orElseThrow(() -> new RuntimeException("Payment transaction not found for external payment ID: " + cmd.paymentId()));
 
                 switch (booking.status()) {
-                    case PENDING -> {
-                        if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
-                            confirmBooking(booking, seat, payment, cmd);
-                        } else {
-                            failBooking(booking, seat, payment, cmd);
-                        }
-                    }
-                    case EXPIRED, CANCELLED -> {
-                        if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
-                            handleLateArrival(booking, payment, cmd);
-                            triggerRefund[0] = true;
-                            refundExternalId[0] = payment.externalPaymentId();
-                        } else {
-                            paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
-                            eventPublisher.publishEvent(new PaymentNotificationProcessedEvent(cmd.eventId(), cmd.rawPayload(), "Failed payment for already expired/cancelled booking"));
-                        }
-                    }
-                    case CONFIRMED -> {
-                        eventPublisher.publishEvent(new BookingDuplicateNotificationEvent(booking, cmd.eventId(), cmd.rawPayload()));
-                        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", "Duplicate webhook for confirmed booking");
-                    }
+                    case PENDING            -> handlePendingNotification(booking, seat, payment, cmd);
+                    case EXPIRED, CANCELLED -> handleLateNotification(booking, payment, cmd, triggerRefund, refundExternalId);
+                    case CONFIRMED          -> handleConfirmedNotification(booking, cmd);
                 }
             });
 
@@ -100,6 +82,30 @@ public class PaymentNotificationService implements HandlePaymentNotificationUseC
             paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "FAILED", e.getMessage());
             throw e;
         }
+    }
+
+    private void handlePendingNotification(Booking booking, Seat seat, Payment payment, PaymentNotificationCommand cmd) {
+        if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
+            confirmBooking(booking, seat, payment, cmd);
+        } else {
+            failBooking(booking, seat, payment, cmd);
+        }
+    }
+
+    private void handleLateNotification(Booking booking, Payment payment, PaymentNotificationCommand cmd, boolean[] triggerRefund, String[] refundExternalId) {
+        if ("SUCCESS".equalsIgnoreCase(cmd.status())) {
+            handleLateArrival(booking, payment, cmd);
+            triggerRefund[0] = true;
+            refundExternalId[0] = payment.externalPaymentId();
+        } else {
+            paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", null);
+            eventPublisher.publishEvent(new PaymentNotificationProcessedEvent(cmd.eventId(), cmd.rawPayload(), "Failed payment for already expired/cancelled booking"));
+        }
+    }
+
+    private void handleConfirmedNotification(Booking booking, PaymentNotificationCommand cmd) {
+        eventPublisher.publishEvent(new BookingDuplicateNotificationEvent(booking, cmd.eventId(), cmd.rawPayload()));
+        paymentNotificationRepo.saveEvent("mock-payment", cmd.eventId(), cmd.rawPayload(), "PROCESSED", "Duplicate webhook for confirmed booking");
     }
 
     private void confirmBooking(Booking booking, Seat seat, Payment payment, PaymentNotificationCommand cmd) {
