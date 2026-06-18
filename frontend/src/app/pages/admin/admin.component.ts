@@ -66,12 +66,20 @@ import { AdminService, AdminBookingDto, AuditLogDto } from '../../core/services/
 
         <!-- Audit Log Card -->
         <div class="card admin-card" style="margin-top: 32px;">
-          <div class="card-header">
-            <h2>Recent Audit Log (Last 20)</h2>
+          <div class="card-header-actions">
+            <h2>System Audit Log</h2>
+            <div class="filter-tabs">
+              <button class="tab-btn" [class.active]="activeTab === 'ALL'" (click)="activeTab = 'ALL'">All</button>
+              <button class="tab-btn" [class.active]="activeTab === 'BOOKING'" (click)="activeTab = 'BOOKING'">Bookings</button>
+              <button class="tab-btn" [class.active]="activeTab === 'SEAT'" (click)="activeTab = 'SEAT'">Seats</button>
+              <button class="tab-btn" [class.active]="activeTab === 'PAYMENT'" (click)="activeTab = 'PAYMENT'">Payments</button>
+              <button class="tab-btn" [class.active]="activeTab === 'WEBHOOK'" (click)="activeTab = 'WEBHOOK'">Webhooks</button>
+              <button class="tab-btn" [class.active]="activeTab === 'SYSTEM'" (click)="activeTab = 'SYSTEM'">System</button>
+            </div>
             <span class="refresh-indicator">Auto-refreshes every 5s</span>
           </div>
           <div class="table-wrapper">
-            <table *ngIf="auditLogs.length > 0; else noLogs">
+            <table *ngIf="filteredAuditLogs.length > 0; else noLogs">
               <thead>
                 <tr>
                   <th>Time</th>
@@ -79,10 +87,11 @@ import { AdminService, AdminBookingDto, AuditLogDto } from '../../core/services/
                   <th>Action</th>
                   <th>Entity Type</th>
                   <th>Entity ID</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let log of auditLogs">
+                <tr *ngFor="let log of filteredAuditLogs">
                   <td>{{ formatDate(log.createdAt) }}</td>
                   <td>{{ log.actor }}</td>
                   <td>
@@ -92,12 +101,45 @@ import { AdminService, AdminBookingDto, AuditLogDto } from '../../core/services/
                   </td>
                   <td>{{ log.entityType }}</td>
                   <td class="mono-text" [title]="log.entityId">{{ log.entityId | slice:0:8 }}...</td>
+                  <td>
+                    <button class="btn btn-secondary btn-xs" (click)="viewDetails(log)">View Details</button>
+                  </td>
                 </tr>
               </tbody>
             </table>
             <ng-template #noLogs>
-              <div class="no-data">No audit logs found.</div>
+              <div class="no-data">No audit logs found for category: {{ activeTab }}.</div>
             </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div *ngIf="selectedLog" class="modal-overlay" (click)="closeModal()">
+      <div class="modal-content card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Audit Log Details</h3>
+          <button class="close-btn" (click)="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-meta-grid">
+            <div><strong>Actor:</strong> {{ selectedLog.actor }}</div>
+            <div><strong>Action:</strong> {{ selectedLog.action }}</div>
+            <div><strong>Entity Type:</strong> {{ selectedLog.entityType }}</div>
+            <div><strong>Entity ID:</strong> <span class="mono-text">{{ selectedLog.entityId }}</span></div>
+            <div><strong>Time:</strong> {{ formatDate(selectedLog.createdAt) }}</div>
+          </div>
+          
+          <div class="payload-comparison">
+            <div class="payload-box">
+              <h4>Before State</h4>
+              <pre><code>{{ formatPayload(selectedLog.beforeState) }}</code></pre>
+            </div>
+            <div class="payload-box">
+              <h4>After State</h4>
+              <pre><code>{{ formatPayload(selectedLog.afterState) }}</code></pre>
+            </div>
           </div>
         </div>
       </div>
@@ -134,6 +176,47 @@ import { AdminService, AdminBookingDto, AuditLogDto } from '../../core/services/
       font-size: 20px;
       font-weight: 700;
     }
+    .card-header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .card-header-actions h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-primary);
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
     .refresh-indicator {
       font-size: 12px;
       color: var(--text-muted);
@@ -167,6 +250,22 @@ import { AdminService, AdminBookingDto, AuditLogDto } from '../../core/services/
       border-radius: 6px;
       width: auto;
     }
+    .btn-xs {
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      width: auto;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-xs:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-primary);
+      border-color: var(--border-focus);
+    }
     .toast-success-banner {
       background: rgba(16, 185, 129, 0.15);
       border-left: 5px solid var(--success);
@@ -183,6 +282,114 @@ import { AdminService, AdminBookingDto, AuditLogDto } from '../../core/services/
       border-width: 2px;
       margin-right: 6px;
     }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-content {
+      width: 90%;
+      max-width: 850px;
+      max-height: 85vh;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 0.2s ease;
+    }
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .close-btn:hover {
+      color: var(--text-primary);
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .modal-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .payload-comparison {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    @media (min-width: 768px) {
+      .payload-comparison {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .payload-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .payload-box h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .payload-box pre {
+      background: #070b15;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow: auto;
+      max-height: 320px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #a5b4fc;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
   `]
 })
 export class AdminComponent implements OnInit, OnDestroy {
@@ -190,6 +397,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   auditLogs: AuditLogDto[] = [];
   reconcilingIds: Set<string> = new Set();
   
+  activeTab: string = 'ALL';
+  selectedLog: AuditLogDto | null = null;
+
   successMessage: string | null = null;
   errorMessage: string | null = null;
 
@@ -220,6 +430,13 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (this.alertTimeout) clearTimeout(this.alertTimeout);
   }
 
+  get filteredAuditLogs(): AuditLogDto[] {
+    if (this.activeTab === 'ALL') {
+      return this.auditLogs;
+    }
+    return this.auditLogs.filter(log => log.entityType === this.activeTab);
+  }
+
   loadBookings(): void {
     this.adminService.getPendingBookings().subscribe({
       next: (bookings) => {
@@ -232,7 +449,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   loadLogs(): void {
-    this.adminService.getAuditLogs(20).subscribe({
+    this.adminService.getAuditLogs(50).subscribe({ // Fetch slightly more logs so filtering results are representative
       next: (logs) => {
         this.auditLogs = logs;
       },
@@ -260,6 +477,24 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.showError(err.error?.message || 'Reconciliation failed. Seat hold may have expired or payment was not found.');
       }
     });
+  }
+
+  viewDetails(log: AuditLogDto): void {
+    this.selectedLog = log;
+  }
+
+  closeModal(): void {
+    this.selectedLog = null;
+  }
+
+  formatPayload(payload: string): string {
+    if (!payload) return 'None';
+    try {
+      const parsed = JSON.parse(payload);
+      return JSON.stringify(parsed, null, 2);
+    } catch (e) {
+      return payload;
+    }
   }
 
   formatDate(dateStr: string): string {

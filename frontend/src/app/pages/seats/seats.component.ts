@@ -181,6 +181,7 @@ export class SeatsComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error fetching seats', err);
+        this.showToast('Failed to load seats. The backend server may be offline.');
       }
     });
   }

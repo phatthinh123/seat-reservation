@@ -53,7 +53,7 @@ Keycloak performs an in-memory database bootstrap and realm import on first star
 
 ```bash
 # Watch logs until you see "Listening on: http://0.0.0.0:8080"
-docker compose logs -f keycloak
+docker compose logs -f seat-reservation-keycloak
 ```
 
 Press `Ctrl+C` once you see the ready message (usually 30–60 seconds).
